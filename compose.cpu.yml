@@ -1,0 +1,41 @@
+services:
+  margin:
+    build: .
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8787:8787"
+    environment:
+      ABS_URL: ${ABS_URL:?Set your Audiobookshelf address}
+      ABS_TOKEN: ${ABS_TOKEN:?Set your Audiobookshelf API token}
+      MARGIN_PASSWORD: ${MARGIN_PASSWORD:?Set a Margin password}
+      WHISPER_URL: http://whisper:8080
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-en}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    volumes:
+      - margin-data:/data
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  whisper:
+    build:
+      context: .
+      dockerfile: docker/whisper.cpu.Dockerfile
+    environment:
+      WHISPER_THREADS: ${WHISPER_THREADS:-4}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small.en}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-en}
+    volumes:
+      - whisper-models:/models
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  margin-data:
+  whisper-models:

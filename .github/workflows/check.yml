@@ -1,0 +1,55 @@
+name: Validate Margin
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm run build
+      - run: npm test
+        env:
+          FFMPEG_PATH: /usr/bin/ffmpeg
+      - run: sh -n setup.sh && sh -n doctor.sh && sh -n docker/whisper-entrypoint.sh
+  worker-build:
+    # Manual until each backend has been hardware-tested. These runners do not have GPUs.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cpu, vulkan, cuda]
+        include:
+          - backend: cpu
+            dockerfile: docker/whisper.cpu.Dockerfile
+          - backend: vulkan
+            dockerfile: docker/whisper.Dockerfile
+          - backend: cuda
+            dockerfile: docker/whisper.cuda.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f '${{ matrix.dockerfile }}' -t margin-worker-check .
+      - name: CPU inference smoke check
+        if: matrix.backend == 'cpu'
+        shell: bash
+        run: |
+          docker run -d --name margin-worker-check -e WHISPER_MODEL=tiny.en -p 127.0.0.1:18080:8080 margin-worker-check
+          trap 'docker logs margin-worker-check; docker rm -f margin-worker-check' EXIT
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:18080/health >/dev/null; then break; fi
+            sleep 5
+          done
+          curl --fail --silent --show-error --max-time 300 http://127.0.0.1:18080/inference \
+            -F file=@public/demo.wav -F response_format=verbose_json > /tmp/margin-inference.json
+          node --input-type=module -e "import fs from 'node:fs';const r=JSON.parse(fs.readFileSync('/tmp/margin-inference.json'));if(!r.segments?.length&&!r.transcription?.length)throw Error('No caption segments returned');"
