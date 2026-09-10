@@ -1,120 +1,113 @@
 # Margin
 
-A self-hosted Audiobookshelf companion for listening with generated captions, saving sentence highlights, and taking notes. Runs with Intel/AMD Vulkan, NVIDIA CUDA, or CPU-only transcription configurations.
+Listen to your Audiobookshelf library with captions, highlight a sentence, and save a note linked to that moment in the audio. Margin runs on your own Docker host and generates captions locally with whisper.cpp.
 
-**Status: early release, v0.1.5.** Download versioned prebuilt containers instead of compiling locally. The release workflow builds Linux amd64/arm64 app and CPU images, plus amd64 Vulkan and CUDA images. Intel Arc A310 transcription is user-tested; NVIDIA and AMD inference still require hardware validation. [Releases and installation downloads](https://github.com/OscarsWorldTech/margin/releases) appear after the publishing workflow completes.
+![Margin reader with sample captions and a saved note](docs/screenshots/reader.png)
 
-## What it does
+*Actual app in sample mode, using a public-domain speech excerpt and prepared captions.*
 
-- Connects to an existing Audiobookshelf server using a server-side API token.
-- Browses audiobook libraries, with pagination and search of loaded books.
-- Streams audio through Margin, including seeking and multiple audio tracks.
-- Resumes from Audiobookshelf and writes listening position every 15 seconds while playing, on pause, and on paused seeks. Checks for another device’s position before resuming, when returning to a visible tab, and every 15 seconds while paused.
-- Keeps the player running when returning to the library through the Library button or Margin logo. Click the player’s book title to return to its captions. Library selection displays the library name.
-- Generates captions with local whisper.cpp, independently of the interface.
-- Processes one book at a time in three-minute sections, with one second of context around internal boundaries. Saves completed sections and supports pause/resume. Interrupted jobs become paused after restart.
-- Displays captions in sync, follows the active sentence, supports caption search and chapter navigation. Renders 80 passages at a time to keep long audiobooks responsive; use Earlier/Later passages to browse manually.
-- Selects sentences with checkboxes or by selecting text. Press **H** to select the currently playing sentence; **Space** toggles playback outside inputs.
-- Saves the quote, book timestamp, your note, and highlight color in SQLite. Notes remain attached to their saved quote if captions are replaced.
-- Edits/removes notes and exports them as Markdown or JSON.
-- Imports existing SRT/VTT captions and allows a session-specific timing adjustment.
+- Read along with the active sentence, search passages, and jump to chapters.
+- Save sentence highlights and notes; export them as Markdown or JSON.
+- Keep listening while browsing your library, and fine-tune playback speed.
+- Resume your listening position between Margin and Audiobookshelf.
+- Generate captions with Intel/Vulkan, NVIDIA/CUDA, or CPU transcription. Import SRT/VTT when you already have captions.
 
-## Install or upgrade
+Margin is an early, single-user application. Everyone using its password shares one library, notes collection, and Audiobookshelf account. It connects to an existing Audiobookshelf server; it does not replace one.
 
-Download the installation ZIP from [Releases](https://github.com/OscarsWorldTech/margin/releases), extract its `margin` folder, and follow [Install from prebuilt containers](docs/INSTALL.md). Existing users should copy the updated files into their **existing deployment folder**, preserving `.env`, Compose customizations and the same named volumes/project name.
+## Before you install
 
-```sh
-sh setup.sh intel
-# Or: sh setup.sh nvidia / sh setup.sh cpu / sh setup.sh amd
+You need:
+
+1. A working [Audiobookshelf server](https://www.audiobookshelf.org/) with at least one playable audiobook.
+2. A Linux machine or VM with Docker Engine and the Docker Compose plugin. Windows/macOS Docker users can use Linux CPU containers, but those hosts have not been fully tested.
+3. An Audiobookshelf API key for the account whose library and listening progress you want to use.
+4. Storage for container images, a Whisper model, and the largest audiobook audio file being transcribed. Model and memory needs vary; start with `base.en` if resources are limited. The default is `small.en`.
+
+You do not need a GPU on the device running your browser. A GPU in the Docker host is optional and only accelerates transcription.
+
+## Install
+
+### 1. Download Margin
+
+Download **margin-v0.1.5-install.zip** from the [v0.1.5 release](https://github.com/OscarsWorldTech/margin/releases/tag/v0.1.5). Extract it on your Docker host and open a terminal in the extracted `margin` folder. Keep the complete folder together, including `.env.example`.
+
+While this repository is private, access to its source and release downloads requires an authorized GitHub account. Container images are publicly downloadable. This development branch contains changes that are not yet in v0.1.5; [build from source](docs/DEVELOPMENT.md) to test them before the next release.
+
+### 2. Choose your hardware
+
+Run **one** command in that folder:
+
+| Docker host | Command | Requirements |
+| --- | --- | --- |
+| CPU, Linux amd64 or arm64 | `sh setup.sh cpu` | No GPU setup; slower transcription |
+| Intel GPU, Linux amd64 | `sh setup.sh intel` | Working host driver and `/dev/dri` render device; Arc A310 has been tested |
+| NVIDIA GPU, Linux amd64 | `sh setup.sh nvidia` | Compatible NVIDIA driver and NVIDIA Container Toolkit configured for Docker |
+| AMD GPU, Linux amd64 | `sh setup.sh amd` | Vulkan-capable host driver and `/dev/dri`; experimental |
+
+The helper creates `.env` and saves your hardware choice. It does not install drivers. NVIDIA and AMD GPU inference still need hardware validation. Read [hardware setup and troubleshooting](docs/HARDWARE.md) for passthrough, drivers, alternate render nodes, and compatibility details.
+
+### 3. Create your Audiobookshelf API key
+
+In the Audiobookshelf web app, an administrator can open **Settings → Users → API Keys** and create a key named **Margin**. Select the user you listen as, make the key active, then copy it when shown. The key inherits that user's permissions and listening progress. Keep track of any expiration date. See the [official API key guide](https://audiobookshelf.org/docs/documentation/server-management/api-keys/).
+
+Older Audiobookshelf versions expose a user API token under the user's settings instead. Margin's setting is called `ABS_TOKEN` for both forms. Do not use a short-lived browser session token or include `Bearer ` in the value. Keep the key in `.env`, out of screenshots and Git commits.
+
+### 4. Edit `.env`
+
+Open `.env` in a text editor and replace these values:
+
+```dotenv
+ABS_URL=http://YOUR-AUDIOBOOKSHELF-HOST:13378
+ABS_TOKEN='YOUR-API-KEY'
+MARGIN_PASSWORD='CHOOSE-A-LONG-UNIQUE-PASSWORD'
+BIND_ADDRESS=0.0.0.0
 ```
 
-Fill in the Audiobookshelf address/token, Margin password and LAN bind address in `.env`, then:
+- `ABS_URL` must be reachable **from inside Docker**. Include the full subpath if your server uses one. `localhost` inside Margin means the Margin container, not your Audiobookshelf host.
+- `MARGIN_PASSWORD` is the password for opening Margin, not your Audiobookshelf password. Single quotes preserve literal characters such as `$` and `#`; avoid a literal single quote in this value.
+- `BIND_ADDRESS=0.0.0.0` allows other devices on your network to reach port 8787. For access only from the Docker host, keep `127.0.0.1` instead. Use your VPN or HTTPS reverse proxy for remote access.
+
+Keep the hardware selection written by setup.sh and `MARGIN_VERSION=v0.1.5`. For non-English audio, choose a multilingual model such as `small` and set `WHISPER_LANGUAGE=auto` or a language code. Sentence splitting currently follows English punctuation conventions.
+
+### 5. Start the services
 
 ```sh
 docker compose pull
 docker compose up -d
+docker compose logs -f whisper
+```
+
+The first startup downloads the selected model. Wait for Whisper to start its server; press Ctrl+C to stop following logs (the services keep running). Then check:
+
+```sh
 sh doctor.sh
 ```
 
-`setup.sh` now defaults to the prebuilt configurations and preserves credentials. Existing Intel users must run it once to switch from their old source-build Compose file. For later upgrades, set `MARGIN_VERSION` in `.env` to the desired release tag, then pull/start again. The header shows the installed version. No `latest` tag is used and no caption regeneration is needed when retaining existing volumes.
+Open **http://YOUR-DOCKER-HOST:8787** in your browser and sign in with your Margin password. If the browser cannot connect, check the bind address, host firewall and whether both containers are running. If the library cannot load, check `ABS_URL`, the API key, and the selected user's permissions. Restart Margin after editing `.env` with `docker compose up -d`.
 
-### Playback speed
+### 6. Transcribe your first book
 
-Click the speed button in the player to open a compact adjustment panel. Choose a preset (0.5×, 1×, 1.2×, 1.5×, or 2×), or use minus/plus to fine-tune in 0.05× or 0.1× steps. The default step is 0.05×; select the 1× preset to reset. The control supports 0.5×–10×, subject to the browser's audio support. Changes apply without seeking, pausing, or reloading the track. Pitch preservation is requested from the browser. Very high speeds can be muted or sound poor in some browsers; choose a lower rate if that happens.
+Choose an Audiobookshelf library, open a short book, and click **Generate captions**. Margin processes audio in sections and saves each completed section. Keep the Docker host running while transcription proceeds; you can close the browser. Use **Pause after this section** and **Resume captions** to continue later.
 
-Speed and step size are remembered on this browser across page reloads and book changes. They are device-local preferences, independent of Audiobookshelf's own speed setting. Browser storage restrictions may prevent remembering preferences, but the controls still work during the session. Caption timestamps and synced listening positions continue to use the original book timeline.
+Press Play to read along. Click a passage timestamp to replay it, select a sentence to add a highlight or note, and use the speed button to adjust listening speed. Your original audio files are not changed.
 
-### Listening-position sync
+![Playback speed presets and fine adjustment](docs/screenshots/playback-speed.png)
 
-The library dropdown switches between the audiobook libraries your configured Audiobookshelf account can access. Progress is shared with the **account that owns `ABS_TOKEN`**, so use that same account in the Audiobookshelf app. A token from a different account synchronizes that other account’s position.
+See [listening, notes, sync and limitations](docs/USAGE.md) for keyboard shortcuts, exports, and using another Audiobookshelf client.
 
-Pause in one app before continuing in the other. Margin reads the current position before starting playback and polls while paused; it does not jump to another device’s position during active playback. Local seeks and listening progress take precedence over a delayed remote read. Sync failures remain visible in the player and retry; switching books or signing out waits for unsaved progress to sync. Settings also offers **Sync progress now**.
+## Already installed?
 
-Navigating to the library keeps the same audio player alive. Opening the currently playing book restores its reader without reloading audio. Opening a different book saves the old position and loads the new book paused. Closing or reloading the browser still stops playback; a final save is attempted when the page is hidden or closed, but abrupt browser/network termination can lose changes since the last successful sync. Failed progress writes are held in the open page, not persisted as an offline queue. Audiobookshelf listening-session statistics are not included.
+Follow the [upgrade guide](docs/UPGRADING.md). Keep your existing `.env`, deployment folder, Compose project name, and named volumes so captions, notes, listening positions and model downloads are retained. Do not use `docker compose down -v` when upgrading.
 
-## Hardware and source builds
+## Try a sample or contribute
 
-NVIDIA requires a compatible driver and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the Docker host. Intel/AMD requires working GPU passthrough and a render device. CPU mode needs neither. GPU, model, memory and platform details are in [Hardware and installation](docs/HARDWARE.md).
-
-Developers can use the full repository and opt into source builds:
-
-```sh
-MARGIN_INSTALL_MODE=source sh setup.sh cpu
-# Substitute intel, amd or nvidia as needed.
-docker compose up -d --build
-```
-
-Source configurations remain `compose.yml`, `compose.cpu.yml`, and `compose.nvidia.yml`. Prebuilt configurations have `compose.prebuilt` in their filenames. All use the same data-volume names. Never merge two hardware configurations with multiple `-f` arguments.
-
-## Sample mode
-
-To review listening and annotation without your library or GPU:
-
-```sh
-docker compose -f compose.demo.yml up --build
-```
-
-Open `http://localhost:8787` on the machine running Docker. This mode has no login and binds only to loopback. It uses a short public-domain JFK speech excerpt and prepared, approximate captions. It does not demonstrate automatic transcription. Demo notes have a separate volume.
+The [development guide](docs/DEVELOPMENT.md) explains sample mode, local setup, source builds and checks. Sample mode needs no Audiobookshelf account or GPU and uses a short public-domain recording with prepared captions. It demonstrates listening and note taking, not automatic transcription quality.
 
 ## Storage and privacy
 
-The `margin-data` volume holds `margin.sqlite` and its journal files, plus an audio cache. The `whisper-models` volume holds model weights. Back up `margin-data` while Margin is stopped, or use a SQLite-aware backup tool. Do not delete these volumes during an upgrade.
+`margin-data` holds the SQLite database and temporary transcription audio. `whisper-models` holds downloaded models. Back up the data volume while Margin is stopped, or use a SQLite-aware backup. Completed source tracks are removed from the cache; paused or failed transcription may retain its current track until it can resume.
 
-The backend downloads each audio track needed for transcription, then deletes it once that track is fully processed. A failed/paused job may leave its current source track cached so it can resume. Allow disk space for the largest source track plus captions and notes. Playback is streamed rather than stored in the browser.
-
-This first version is **single-user**. Everyone with the Margin password sees the same library and annotations, and writes progress to the same Audiobookshelf account. API tokens never appear in the browser's audio URLs or API responses. Sessions expire after seven days and are invalidated by a server restart. Original audio and ebooks are not modified; notes are stored in Margin, not Audiobookshelf.
-
-For remote access, use your existing VPN or HTTPS reverse proxy. Set `COOKIE_SECURE=true` for HTTPS. When the proxy changes the Host header, add your external origin to `ALLOWED_ORIGINS`. The transcription worker has no published host port. This is an initial personal app, not a reviewed multi-tenant public service.
-
-## Known limitations
-
-- **The v0.1.3 speed control is locally built and rendered, but not yet verified in live browser playback on the VM.** The user reports successful A310 transcription and confirms the v0.1.2 update works. Integration tests emulate Audiobookshelf and the transcription response, while running real FFmpeg conversion. Browser interaction tests were not run.
-- Captions can mishear names or omit words. Sentence boundaries split inside a recognition segment use estimated proportional timing; this is not word-level forced alignment. Import corrected SRT/VTT captions when needed.
-- Caption offset is session-local. Playback speed and its adjustment step are remembered in browser storage. Notes are durable and available when the book is reopened on another device; there is no live multi-device note merge UI.
-- Changes to the source audio after transcription require a new caption import or manual reset of that book's stored transcript/job. Automatic audio fingerprinting and retranscription are not implemented yet.
-- Multi-track playback can have a short gap at track boundaries. Browser support for an audio codec varies; no fallback HLS transcoder, offline download mode or native mobile app is included.
-- Progress sync is implemented, but Audiobookshelf listening-session statistics are not reported. Simultaneous playback on multiple clients can overwrite position with the latest update.
-- A source download or inference call can take time to stop. Failed jobs show an error and require an explicit Resume; they are not retried forever in the background.
-- Removing a note has no undo. Export before bulk cleanup. There is no bulk delete feature.
-- Docker currently builds the frontend from the retained Sites starter dependency lockfile. `npm audit` reports advisories in that starter/build-tool dependency tree. The final runtime image contains static browser assets and the Node standard-library server; it does not include `node_modules`, Vinext, or React Server Components. Review/update build dependencies before a broader deployment.
-
-## Development and checks
-
-The validation workflow checks the app and deployment configurations on pushes and pull requests. Pushing a version tag matching package.json runs the publishing workflow: tests first, native builds for each architecture, application/CPU smoke checks, then version manifests and an installation ZIP. CUDA/Vulkan builds check linking but do not run GPU inference on hosted CPU runners. See `.github/workflows/publish.yml` and `docs/RELEASE.md`.
-
-Node 24+ is recommended. The server uses Node's built-in SQLite and has no runtime npm dependencies. The interface is React + Vite with the starter's Shadcn primitives. The app is deliberately packaged for self-hosting, with no Sites cloud deployment or hosted storage dependency.
-
-```sh
-npm ci
-npm run build
-npm test
-```
-
-To also exercise successful conversion and interrupted/resumed transcription in the integration test, set `FFMPEG_PATH` to a local FFmpeg executable before running `npm test`. The inference response remains simulated; this test verifies request format, chunk persistence and multi-track offsets, not speech-recognition accuracy.
-
-For local development, run the server with environment variables (`DEMO_MODE=true` for the sample) and `npm run dev` in another terminal. Allow `http://127.0.0.1:5173` via `ALLOWED_ORIGINS` when using the development proxy. Production is a single Node process on port 8787 plus the worker.
-
-A feature-detected, read-only WebMCP tool exposes the current book, position and notes to a compatible browser agent. Registration was not runtime-tested in a supported WebMCP browser; unsupported browsers simply ignore it.
+Audio is sent to your local transcription worker. Installation and the initial model download require internet access. Notes are stored in Margin rather than Audiobookshelf. Sessions expire after seven days or a server restart. For HTTPS, set `COOKIE_SECURE=true`; if a reverse proxy changes the Host header, configure `ALLOWED_ORIGINS` for your external origin.
 
 ## Sources and credits
 

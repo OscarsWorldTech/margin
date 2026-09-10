@@ -34,6 +34,10 @@ case "$install_mode" in
   source) ;;
   *) echo 'MARGIN_INSTALL_MODE must be prebuilt or source'; exit 1 ;;
 esac
+if [ ! -f "$compose_file" ]; then
+  echo "Missing $compose_file. Extract the complete installation bundle, or use the full repository for source builds."
+  exit 1
+fi
 if [ -L .env ]; then echo 'The .env file is a symlink. Edit COMPOSE_FILE manually instead.'; exit 1; fi
 umask 077
 if [ ! -e .env ]; then cp .env.example .env; fi

@@ -10,13 +10,12 @@ out=root/'release'
 out.mkdir(exist_ok=True)
 archive=out/f'margin-v{version}-install.zip'
 files=['compose.prebuilt.yml','compose.prebuilt.cpu.yml','compose.prebuilt.nvidia.yml',
-       'setup.sh','doctor.sh','.env.example','LICENSE','docs/INSTALL.md','docs/HARDWARE.md']
+       'setup.sh','doctor.sh','.env.example','LICENSE','README.md','docs/INSTALL.md',
+       'docs/HARDWARE.md','docs/UPGRADING.md','docs/USAGE.md','docs/DEVELOPMENT.md']
+files += [p.relative_to(root).as_posix() for p in sorted((root/'docs/screenshots').glob('*.png'))]
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
     for name in files:
-        target='README.md' if name=='docs/INSTALL.md' else name
-        z.write(root/name,'margin/'+target)
-        if name=='docs/INSTALL.md':
-            z.write(root/name,'margin/'+name)
+        z.write(root/name,'margin/'+name)
 with zipfile.ZipFile(archive) as z:
     assert z.testzip() is None
 digest=hashlib.sha256(archive.read_bytes()).hexdigest()
