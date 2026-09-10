@@ -25,7 +25,50 @@ You need:
 
 You do not need a GPU on the device running your browser. A GPU in the Docker host is optional and only accelerates transcription.
 
-## Install
+## Install the all-in-one image
+
+The all-in-one image includes Margin and its transcription worker in **one container**. No source download or local build is required. Audiobookshelf still runs separately.
+
+These are **preview images** containing the latest development changes. The existing `v0.1.5` tag is app-only. Pick the image for your Docker host:
+
+| Hardware | Pull command |
+| --- | --- |
+| CPU (amd64 / arm64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cpu` |
+| Intel / experimental AMD (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-vulkan` |
+| NVIDIA (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cuda` |
+
+For a first CPU installation:
+
+1. Create an Audiobookshelf API key using the [instructions below](#3-create-your-audiobookshelf-api-key).
+2. Create a file named `margin.env` in your installation folder with these values. For this Docker `--env-file` format, **do not put quotes around the values**:
+
+   ```dotenv
+   ABS_URL=http://YOUR-AUDIOBOOKSHELF-HOST:13378
+   ABS_TOKEN=YOUR-API-KEY
+   MARGIN_PASSWORD=CHOOSE-A-LONG-UNIQUE-PASSWORD
+   WHISPER_MODEL=small.en
+   WHISPER_LANGUAGE=en
+   ```
+
+3. Pull and start the image:
+
+   ```sh
+   docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cpu
+   docker run -d --name margin --restart unless-stopped \
+     --env-file margin.env \
+     -p 8787:8787 \
+     -v margin-data:/data \
+     -v whisper-models:/models \
+     ghcr.io/oscarsworldtech/margin:preview-aio-cpu
+   ```
+
+4. Follow `docker logs -f margin` until the first model download and Whisper startup finish. Open **http://YOUR-DOCKER-HOST:8787**, sign in with your Margin password, open a book, and choose **Generate captions**.
+
+This publishes port 8787 on the host's network interfaces. Use `-p 127.0.0.1:8787:8787` for host-only access. Saved captions and notes live in `margin-data`; models live in `whisper-models`. Keep both volumes when updating.
+
+Intel and NVIDIA need additional GPU options. The [all-in-one guide](docs/ALL_IN_ONE.md) includes those options, single-container Compose files, updates, diagnostics, and migration from the previous two-container setup. Existing installations should follow that guide to reuse their actual volume names.
+
+## Install with separate containers
 
 ### 1. Download Margin
 

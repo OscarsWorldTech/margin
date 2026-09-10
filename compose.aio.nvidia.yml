@@ -1,0 +1,32 @@
+services:
+  margin:
+    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}:${MARGIN_AIO_VERSION:-preview}-aio-cuda
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8787:8787"
+    environment:
+      ABS_URL: ${ABS_URL:?Set your Audiobookshelf address}
+      ABS_TOKEN: ${ABS_TOKEN:?Set your Audiobookshelf API token}
+      MARGIN_PASSWORD: ${MARGIN_PASSWORD:?Set a Margin password}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small.en}
+      WHISPER_THREADS: ${WHISPER_THREADS:-4}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-en}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    volumes:
+      - margin-data:/data
+      - whisper-models:/models
+    restart: unless-stopped
+    stop_grace_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    platform: linux/amd64
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${NVIDIA_GPU_ID:-0}"]
+              capabilities: [gpu]
+volumes:
+  margin-data:
+  whisper-models:

@@ -46,3 +46,11 @@ Pushes and PRs run `.github/workflows/check.yml`. Version tags matching package.
 Development work should stay on branches for review. Do not push a version tag or run publishing just to test a change. Existing published image tags remain unchanged until an intentional release. `python scripts/release-bundle.py` creates a local installation archive, not a release.
 
 README screenshots are actual demo-mode captures with synthetic annotations. Keep tokens, private books and personal host addresses out of screenshots. The optional read-only WebMCP tool exposes the current demo/book context on compatible browsers; unsupported browsers ignore it.
+
+## All-in-one images
+
+`docker/all-in-one.Dockerfile` adds the app to the selected published worker image. It includes a non-root process supervisor and tini, a combined readiness check, and persistent `/data` and `/models` directories. Local builds are described in [the all-in-one guide](ALL_IN_ONE.md#building-from-source).
+
+The manual Validate Margin workflow's `publish_all_in_one` option builds native CPU amd64/arm64 and GPU amd64 variants. CPU smoke checks perform real sample inference, save a note, recreate the container with the same volumes, verify loopback-only worker access, check clean shutdown, and kill the worker to verify failure propagation. Linux tests also check forced termination of an uncooperative child. GPU jobs check native libraries only.
+
+Only after all four image checks pass are `preview-aio-*` tags published, along with exact `sha-COMMIT-aio-*` tags. Tagged releases publish versioned all-in-one images using their matching worker version before creating release downloads. Preview publishing does not merge a branch or create a Git release.

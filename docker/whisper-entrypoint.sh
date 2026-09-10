@@ -12,6 +12,6 @@ if [ ! -s "$model" ]; then
   mv "$model.part" "$model"
 fi
 echo "Starting Whisper: configured backend=${WHISPER_BACKEND:-vulkan}, model=$WHISPER_MODEL, CPU threads=$WHISPER_THREADS. Verify the selected device in the following engine logs."
-set -- --host 0.0.0.0 --port 8080 --model "$model" --language "${WHISPER_LANGUAGE:-en}" --threads "$WHISPER_THREADS" --no-flash-attn
+set -- --host "${WHISPER_HOST:-0.0.0.0}" --port 8080 --model "$model" --language "${WHISPER_LANGUAGE:-en}" --threads "$WHISPER_THREADS" --no-flash-attn
 if [ "${WHISPER_BACKEND:-vulkan}" = cpu ]; then set -- "$@" --no-gpu; fi
 exec whisper-server "$@"

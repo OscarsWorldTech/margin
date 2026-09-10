@@ -2,7 +2,10 @@ node_modules
 .git
 .env
 .env.*
+margin.env
 data
+data-demo
+release
 work
 outputs
 dist

@@ -120,7 +120,7 @@ jobs:
           name: image-${{ matrix.component }}-${{ matrix.arch }}
           path: image-digests/*.txt
           retention-days: 7
-  release:
+  manifests:
     needs: [verify, images]
     runs-on: ubuntu-24.04
     permissions:
@@ -148,6 +148,23 @@ jobs:
           docker buildx imagetools create -t "$BASE-whisper:$VERSION-cpu" "$(cat image-digests/cpu-amd64.txt)" "$(cat image-digests/cpu-arm64.txt)"
           docker buildx imagetools create -t "$BASE-whisper:$VERSION-vulkan" "$(cat image-digests/vulkan-amd64.txt)"
           docker buildx imagetools create -t "$BASE-whisper:$VERSION-cuda" "$(cat image-digests/cuda-amd64.txt)"
+  all-in-one:
+    needs: [verify, manifests]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/all-in-one.yml
+    with:
+      publish: true
+      tag_prefix: ${{ needs.verify.outputs.version }}
+      worker_version: ${{ needs.verify.outputs.version }}
+  release:
+    needs: [verify, manifests, all-in-one]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Make installation bundle
         run: python3 scripts/release-bundle.py
       - name: Publish release downloads

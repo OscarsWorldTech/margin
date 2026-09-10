@@ -2,6 +2,8 @@
 
 Margin runs on a Docker host or Docker VM. The browser does not need a GPU. Only the Whisper transcription container uses acceleration; playback, captions and notes work with every configuration.
 
+The same hardware prerequisites apply to the [all-in-one images](ALL_IN_ONE.md), where Whisper runs inside the Margin container. The setup commands below select the separate app/worker configurations.
+
 ## Compatibility status
 
 | Hardware / host | Backend | Select with | Verification |
