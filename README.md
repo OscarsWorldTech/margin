@@ -31,7 +31,6 @@ You do not need a GPU on the device running your browser. A GPU in the Docker ho
 
 Download **margin-v0.1.5-install.zip** from the [v0.1.5 release](https://github.com/OscarsWorldTech/margin/releases/tag/v0.1.5). Extract it on your Docker host and open a terminal in the extracted `margin` folder. Keep the complete folder together, including `.env.example`.
 
-While this repository is private, access to its source and release downloads requires an authorized GitHub account. Container images are publicly downloadable. This development branch contains changes that are not yet in v0.1.5; [build from source](docs/DEVELOPMENT.md) to test them before the next release.
 
 ### 2. Choose your hardware
 
