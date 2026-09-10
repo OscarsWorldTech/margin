@@ -38,7 +38,7 @@ start
 ready
 curl --fail --silent http://127.0.0.1:18787/api/books/demo | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{if(JSON.parse(s).notes[0]?.note!=="Container recreation check")process.exit(1);});'
 # A dead worker must terminate the container rather than leave a healthy-looking UI.
-docker exec margin-aio-smoke node --input-type=module -e 'import fs from "node:fs";let found=false;for(const pid of fs.readdirSync("/proc").filter(p=>/^\d+$/.test(p))){try{if(fs.readFileSync(`/proc/${pid}/comm`,"utf8").trim()==="whisper-server"){process.kill(Number(pid),"SIGKILL");found=true;}}catch{}}if(!found)throw Error("Worker process not found");' 
+docker exec margin-aio-smoke node --input-type=module -e 'import fs from "node:fs";let found=false;for(const pid of fs.readdirSync("/proc").filter(p=>/^\d+$/.test(p))){try{if(fs.readFileSync(`/proc/${pid}/comm`,"utf8").trim()==="whisper-server"){process.kill(Number(pid),"SIGKILL");found=true;}}catch{}}if(!found)throw Error("Worker process not found");'
 for attempt in $(seq 1 20); do
   if [ "$(docker inspect --format '{{.State.Running}}' margin-aio-smoke)" = false ]; then break; fi
   sleep 1

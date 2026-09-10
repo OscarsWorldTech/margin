@@ -50,6 +50,8 @@ For a first CPU installation:
    WHISPER_LANGUAGE=en
    ```
 
+   Use an Audiobookshelf address reachable from inside Docker. `localhost` here would point at the Margin container.
+
 3. Pull and start the image:
 
    ```sh

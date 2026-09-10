@@ -11,6 +11,9 @@ on:
       worker_version:
         type: string
         default: v0.1.5
+concurrency:
+  group: all-in-one-${{ inputs.tag_prefix }}-${{ inputs.publish }}
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
