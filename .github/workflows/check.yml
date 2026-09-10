@@ -3,6 +3,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_all_in_one:
+        description: Build and publish preview all-in-one images
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -20,10 +25,10 @@ jobs:
       - run: npm test
         env:
           FFMPEG_PATH: /usr/bin/ffmpeg
-      - run: sh -n setup.sh && sh -n doctor.sh && sh -n docker/whisper-entrypoint.sh
+      - run: sh -n setup.sh && sh -n doctor.sh && sh -n docker/whisper-entrypoint.sh && sh -n scripts/smoke-all-in-one.sh
   worker-build:
     # Manual until each backend has been hardware-tested. These runners do not have GPUs.
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.publish_all_in_one
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -53,3 +58,12 @@ jobs:
           curl --fail --silent --show-error --max-time 300 http://127.0.0.1:18080/inference \
             -F file=@public/demo.wav -F response_format=verbose_json > /tmp/margin-inference.json
           node --input-type=module -e "import fs from 'node:fs';const r=JSON.parse(fs.readFileSync('/tmp/margin-inference.json'));if(!r.segments?.length&&!r.transcription?.length)throw Error('No caption segments returned');"
+  all-in-one:
+    needs: application
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_all_in_one
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/all-in-one.yml
+    with:
+      publish: true

@@ -1,5 +1,7 @@
 # Upgrading Margin
 
+For an all-in-one container, follow [its update and migration instructions](ALL_IN_ONE.md#persistent-data-and-updates). The commands below refer to the separate app and worker installation.
+
 Pause active transcription before replacing its worker. Back up `margin-data` while Margin is stopped, or use a SQLite-aware backup.
 
 1. Read the target release's notes and download its installation ZIP.

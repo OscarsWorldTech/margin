@@ -41,6 +41,21 @@ test('each hardware configuration is complete and keeps storage and credentials 
     assert.deepEqual(prebuilt.margin.volumes,configs['compose.cpu.yml'].services.margin.volumes);
     assert.deepEqual(prebuilt.whisper.volumes,configs['compose.cpu.yml'].services.whisper.volumes);
   }
+  for(const [kind,backend] of [['cpu','cpu'],['intel','vulkan'],['nvidia','cuda']]){
+    const result=spawnSync('docker',[...dockerArgs,'compose','--env-file','.env.example','-f',`compose.aio.${kind}.yml`,'config','--format','json'],{cwd:root,encoding:'utf8',windowsHide:true});
+    assert.equal(result.status,0,result.stderr);
+    const {services}=JSON.parse(result.stdout);
+    assert.deepEqual(Object.keys(services),['margin']);
+    const app=services.margin;
+    assert.ok(app.image.endsWith(`:preview-aio-${backend}`));
+    assert.deepEqual(app.volumes.map(v=>[v.source,v.target]),[['margin-data','/data'],['whisper-models','/models']]);
+    assert.equal(app.ports.length,1);assert.equal(app.ports[0].target,8787);
+    assert.equal(app.environment.WHISPER_URL,undefined,'the built-in worker address is managed by the image');
+    assert.equal(app.build,undefined);
+    if(kind==='cpu'){assert.equal(app.devices,undefined);assert.equal(app.deploy,undefined);}
+    if(kind==='intel')assert.equal(app.devices[0].source,'/dev/dri');
+    if(kind==='nvidia')assert.deepEqual(app.deploy.resources.reservations.devices,[{capabilities:['gpu'],device_ids:['0'],driver:'nvidia'}]);
+  }
 });
 
 test('setup preserves literal credentials, persists hardware choice, and rejects invalid modes without changes',async t=>{

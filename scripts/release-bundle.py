@@ -10,8 +10,9 @@ out=root/'release'
 out.mkdir(exist_ok=True)
 archive=out/f'margin-v{version}-install.zip'
 files=['compose.prebuilt.yml','compose.prebuilt.cpu.yml','compose.prebuilt.nvidia.yml',
+       'compose.aio.cpu.yml','compose.aio.intel.yml','compose.aio.nvidia.yml',
        'setup.sh','doctor.sh','.env.example','LICENSE','README.md','docs/INSTALL.md',
-       'docs/HARDWARE.md','docs/UPGRADING.md','docs/USAGE.md','docs/DEVELOPMENT.md']
+       'docs/ALL_IN_ONE.md','docs/HARDWARE.md','docs/UPGRADING.md','docs/USAGE.md','docs/DEVELOPMENT.md']
 files += [p.relative_to(root).as_posix() for p in sorted((root/'docs/screenshots').glob('*.png'))]
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
     for name in files:
