@@ -49,6 +49,7 @@ test('setup preserves literal credentials, persists hardware choice, and rejects
   t.after(async()=>{if(!path.resolve(folder).startsWith(path.resolve(tmpdir())+path.sep+'margin-setup-test-'))throw Error('Unexpected test directory');await rm(folder,{recursive:true,force:true});});
   await copyFile(path.join(root,'setup.sh'),path.join(folder,'setup.sh'));
   await copyFile(path.join(root,'.env.example'),path.join(folder,'.env.example'));
+  for(const file of ['compose.prebuilt.nvidia.yml','compose.prebuilt.cpu.yml'])await copyFile(path.join(root,file),path.join(folder,file));
   const credentials="ABS_TOKEN='literal-$value-$(touch unexpected)-token'\nMARGIN_PASSWORD='a long password with # and spaces'\n# keep my comment\n";
   await writeFile(path.join(folder,'.env'),credentials+'COMPOSE_FILE=compose.yml\nRENDER_GID=109\n');
   const run=mode=>spawnSync(bash,['setup.sh',mode],{cwd:folder,encoding:'utf8',windowsHide:true});
@@ -59,4 +60,7 @@ test('setup preserves literal credentials, persists hardware choice, and rejects
   assert.equal(run('cpu').status,0);env=await readFile(path.join(folder,'.env'),'utf8');
   assert.ok(env.startsWith(credentials));assert.match(env,/COMPOSE_FILE=compose.prebuilt.cpu.yml/);
   assert.notEqual(run('unknown').status,0);assert.equal(await readFile(path.join(folder,'.env'),'utf8'),env);
+  await rm(path.join(folder,'compose.prebuilt.nvidia.yml'));
+  const incomplete=run('nvidia');assert.notEqual(incomplete.status,0);assert.match(incomplete.stdout,/Missing compose/);
+  assert.equal(await readFile(path.join(folder,'.env'),'utf8'),env,'missing files must not change a working configuration');
 });

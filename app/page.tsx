@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { trackAtPosition } from '@/lib/audio-position';
 import { ProgressSync } from '@/lib/progress-sync';
 import { PlaybackSpeed } from '@/components/playback-speed';
 import { applyPlaybackSpeed, normalizeSpeed, savedSpeed, saveSpeedPreference, SPEED_KEY } from '@/lib/playback-speed';
@@ -71,15 +72,14 @@ export default function Home(){
        status:message=>{if(progress.current===coordinator)setSyncStatus(message);}
      });
      progress.current=coordinator;setSyncStatus('Progress synced');currentBook.current=b;currentPosition.current=b.position;
-     setBook(b);setPosition(b.position);setTrack(Math.max(0,b.tracks.findIndex(t=>b.position>=t.startOffset&&b.position<t.startOffset+t.duration)));
+     setBook(b);setPosition(b.position);setTrack(trackAtPosition(b.tracks,b.position));
      seekTo.current=b.position;setPlaying(false);setView('reader');setSelected([]);setDraft('');setOffset(0);setCaptionQuery('');setReadPage(0);
    });
  }
  function seek(t:number,local=true){
    if(!book)return;
    const target=Math.max(0,Math.min(t,book.duration));
-   const found=book.tracks.findIndex(v=>target>=v.startOffset&&target<v.startOffset+v.duration);
-   const ti=found<0?book.tracks.length-1:found;
+   const ti=trackAtPosition(book.tracks,target);
    currentPosition.current=target;setPosition(target);seekTo.current=target;
    if(local)progress.current?.change(target);
    if(ti===track&&audio.current&&audio.current.readyState>=1){audio.current.currentTime=target-book.tracks[ti].startOffset;seekTo.current=null;}else setTrack(ti);

@@ -115,6 +115,6 @@ To change hardware, pause transcription and wait for its current section to fini
 | Worker stopped after an update | `down` stopped both services; run `docker compose up -d` to bring both back |
 | GPU visible but transcription slow | Actual backend/device selection, CPU fallback, model size and CPU threads |
 | Health check fails during first start | Watch model-download progress in worker logs |
-| Old version still in the header | Copy the updated source into the actual build folder, rebuild Margin, then force-refresh |
+| Old version still in the header | For prebuilt installs, select the new published `MARGIN_VERSION`, pull, and recreate Margin. For source installs, rebuild from the updated checkout. Then refresh the browser. See [upgrading](UPGRADING.md). |
 
 `doctor.sh` checks the saved Compose selection without printing configuration secrets. It does not install packages, restart services, collect book data or upload logs. Health and device checks are not a transcription benchmark.

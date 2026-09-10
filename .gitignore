@@ -38,6 +38,7 @@ next-env.d.ts
 /work/
 
 /data/
+/data-demo/
 *.tsbuildinfo
 !.env.example
 
