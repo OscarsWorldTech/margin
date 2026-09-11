@@ -155,11 +155,14 @@ public class MarginPlayerPlugin extends Plugin {
         notifyListeners("snapshot", snapshot(controller));
     }
 
-    /** The bearer token for media requests. Called on sign-in, sign-out and resume. */
+    /** The bearer token for media requests, and the only origin it may be sent to.
+     * Called on sign-in, sign-out and resume. */
     @PluginMethod
     public void configure(PluginCall call) {
         String token = call.getString("token");
-        PlaybackService.setAuthorization(token == null || token.isEmpty() ? null : "Bearer " + token);
+        String server = call.getString("server");
+        PlaybackService.setAuthorization(
+                token == null || token.isEmpty() ? null : "Bearer " + token, server);
         call.resolve();
     }
 

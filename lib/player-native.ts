@@ -22,7 +22,7 @@ type NativeSnapshot = {
 };
 
 type MarginPlayerPlugin = {
-  configure(options: { token: string | null }): Promise<void>;
+  configure(options: { token: string | null; server: string }): Promise<void>;
   load(options: {
     bookId: string;
     title: string;
@@ -60,8 +60,12 @@ function toSnapshot(native: NativeSnapshot): PlayerSnapshot {
 
 /** `resolve` turns a server-relative media path into an absolute address the
  * native player can fetch, and `token` authenticates those requests. */
-export function createNativePlayer(resolve: (path: string) => string, token: string | null): Player {
-  const configured = MarginPlayer.configure({ token });
+export function createNativePlayer(
+  resolve: (path: string) => string,
+  token: string | null,
+  server: string,
+): Player {
+  const configured = MarginPlayer.configure({ token, server });
   return {
     async load(book: PlayerBook, position: number) {
       await configured;
@@ -107,7 +111,9 @@ export function createNativePlayer(resolve: (path: string) => string, token: str
   };
 }
 
-/** Re-authenticates media requests after a sign-in or sign-out. */
-export function configureNativePlayer(token: string | null): Promise<void> {
-  return MarginPlayer.configure({ token });
+/** Re-authenticates media requests after a sign-in or sign-out. `server` scopes where
+ * the token may be sent; the session is exported, so another app can ask this player to
+ * load a URI of its choosing and must not be able to harvest the credential. */
+export function configureNativePlayer(token: string | null, server: string): Promise<void> {
+  return MarginPlayer.configure({ token, server });
 }
