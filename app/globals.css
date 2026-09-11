@@ -56,3 +56,10 @@
 .speed-step>div{display:flex;gap:5px}
 .speed-popover [data-slot=popover-description]{font-size:14px;color:#b6c9d6;line-height:1.5}
 @media(max-width:760px){.now-playing{flex:1 1 100%;max-width:none}.now-playing>button{display:flex;align-items:center;gap:12px}.now-playing strong{flex:1}.now-playing small{margin-top:2px}.shell:has(.player) .library-view,.reading-layout{padding-bottom:220px}}
+
+/* A tap leaves :hover applied on a touch device until something else is tapped, and
+   .transport button:hover outranks the play button's own background, so pressing play
+   left it dark navy and looking broken. Hold its colour under a sticky hover, and give
+   it a real hover shade only where a pointer can actually hover. */
+.transport .play-button:hover{background:#7fdac0}
+@media(hover:hover){.transport .play-button:hover{background:#6fcfb3}}

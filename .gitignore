@@ -58,3 +58,6 @@ next-env.d.ts
 /docs/MOBILE.md
 /docs/LOCAL.md
 /.claude/settings.local.json
+
+# Android Studio project-local IDE state
+/android/.idea/

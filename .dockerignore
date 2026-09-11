@@ -22,3 +22,6 @@ docs/HANDOFF.md
 docs/MOBILE.md
 docs/LOCAL.md
 .claude/settings.local.json
+
+# Android native project (not part of the server image)
+android

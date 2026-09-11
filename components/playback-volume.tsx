@@ -5,7 +5,9 @@ import {Slider} from '@/components/ui/slider';
 import {Popover,PopoverTrigger,PopoverContent,PopoverTitle,PopoverDescription} from '@/components/ui/popover';
 import {VOLUME_KEY,applyVolume,savedVolume,toggleMute,volumeAt} from '@/lib/playback-volume';
 
-export function PlaybackVolume({audio}:{audio:RefObject<HTMLAudioElement|null>}){
+// Takes anything with volume and muted, matching applyVolume, so the native
+// player can receive the same preference changes as the browser audio element.
+export function PlaybackVolume({audio}:{audio:RefObject<Pick<HTMLAudioElement,'volume'|'muted'>|null>}){
   const [preference,setPreference]=useState(savedVolume),[open,setOpen]=useState(false);
   useEffect(()=>{
     if(audio.current)applyVolume(audio.current,preference);

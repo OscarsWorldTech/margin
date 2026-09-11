@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Margin</string>
+    <string name="title_activity_main">Margin</string>
+    <string name="package_name">com.oscarsworldtech.margin</string>
+    <string name="custom_url_scheme">com.oscarsworldtech.margin</string>
+</resources>

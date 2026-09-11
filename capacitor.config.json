@@ -1,0 +1,10 @@
+{
+  "appId": "com.oscarsworldtech.margin",
+  "appName": "Margin",
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
