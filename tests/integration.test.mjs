@@ -84,5 +84,27 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
    await request('/books/book1/transcribe',{});const completed=await waitFor('done');assert.equal(inference,3,'resume skips completed first track');assert.equal(completed.cues[2].start,11,'second track uses global book timestamps');assert.equal(completed.job.progress,1);
  }else t.diagnostic('FFMPEG_PATH not set: live FFmpeg + mocked inference queue portion not run.');
  const removed=await(await request('/books/book1/notes/'+note.id,{},'DELETE')).json();assert.equal(removed.length,0);
+ // A packaged app runs on its own origin so the SameSite=Strict cookie is never sent, and a
+ // background player cannot read that cookie at all. Both use a bearer token for the same session.
+ const post=(p,headers,value)=>fetch(base+'/api'+p,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(value||{})});
+ const nativeLogin=await post('/login',{},{password:'test-password',client:'native'});
+ const native=await nativeLogin.json();
+ assert.match(native.token,/^[a-f0-9]{64}$/,'a native sign-in returns a session token');
+ assert.equal(nativeLogin.headers.get('set-cookie'),null,'a native session does not also set a browser cookie');
+ assert.equal((await(await post('/login',{},{password:'test-password'})).json()).token,undefined,'a browser sign-in never exposes the token');
+ assert.equal((await post('/login',{},{password:'bad',client:'native'})).status,401,'a native sign-in still needs the password');
+ const bearer={Authorization:'Bearer '+native.token};
+ assert.equal((await(await fetch(base+'/api/status',{headers:bearer})).json()).authenticated,true);
+ const stream=await fetch(base+b.tracks[1].url,{headers:{...bearer,Range:'bytes=0-99'}});
+ assert.equal(stream.status,206,'a background player streams audio with the bearer token');
+ assert.equal((await stream.arrayBuffer()).byteLength,100);
+ assert.ok(!JSON.stringify(await(await fetch(base+'/api/books/book1',{headers:bearer})).json()).includes('private-test-token'),'the phone never receives the Audiobookshelf token');
+ for(const value of ['Bearer '+'0'.repeat(64),'Bearer not-a-token','Basic '+native.token,native.token])
+   assert.equal((await fetch(base+'/api/books/book1',{headers:{Authorization:value}})).status,401,'rejected: '+value.slice(0,12));
+ assert.equal((await post('/books/book1/position',bearer,{time:9})).status,200,'a native client sends no Origin and stays allowed');
+ assert.equal((await post('/books/book1/position',{...bearer,Origin:'https://elsewhere.invalid'},{time:9})).status,403,'the cross-site guard still rejects a browser request holding a token');
+ assert.equal((await post('/logout',bearer)).status,200);
+ assert.equal((await fetch(base+'/api/books/book1',{headers:bearer})).status,401,'signing out revokes the bearer token');
+ assert.equal((await request('/books/book1')).status,200,'a native sign-out leaves the browser session alone');
  assert.ok(received.includes('/abs/s/book1/1'),'media URL retains ABS subpath');
 });

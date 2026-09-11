@@ -136,11 +136,17 @@ const server=http.createServer(async(req,res)=>{
       if(a.until<Date.now()){a.n=0;a.until=Date.now()+60000;}a.n++;attempts.set(remote,a);if(a.n>10)throw failure('Too many attempts. Try again in a minute.',429);
       const input=await body(req,4096);if(!demo&&!safeEqual(String(input.password||''),password))throw failure('Incorrect password.',401);
       const token=randomBytes(32).toString('hex');sessions.set(token,Date.now()+7*86400000);
+      // Native clients keep the token themselves. Browsers only ever receive the cookie.
+      if(input.client==='native')return json(res,200,{ok:true,token});
       res.setHeader('Set-Cookie',`margin_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${process.env.COOKIE_SECURE==='true'?'; Secure':''}`);
       return json(res,200,{ok:true});
     }
-    const token=/(?:^|; )margin_session=([a-f0-9]{64})/.exec(req.headers.cookie||'')?.[1];
-    const authenticated=demo||((sessions.get(token)||0)>Date.now());
+    // A packaged app runs on its own origin, so the SameSite=Strict cookie is never sent and
+    // background players cannot read it at all. Both present the same session token as a bearer
+    // header instead. Native HTTP clients send no Origin or Sec-Fetch-Site, so the cross-site
+    // guard above still applies unchanged to every browser request.
+    const token=[/(?:^|; )margin_session=([a-f0-9]{64})/.exec(req.headers.cookie||'')?.[1],/^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization||'')?.[1]].find(t=>t&&(sessions.get(t)||0)>Date.now());
+    const authenticated=demo||Boolean(token);
     if(p==='/api/status')return json(res,200,{authenticated,demo,configured:demo||Boolean(absBase&&absToken),version});
     if(p.startsWith('/api/')&&!authenticated)throw failure('Sign in to continue.',401);
     if(p==='/api/logout'&&req.method==='POST'){sessions.delete(token);res.setHeader('Set-Cookie','margin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');return json(res,200,{ok:true});}
