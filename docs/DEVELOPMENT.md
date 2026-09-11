@@ -1,5 +1,9 @@
 # Development
 
+For switching between Codex, Claude Code, and chat-based help, see the
+[shared development workflow](AI_WORKFLOW.md). Start a continued task with the
+[current handoff](HANDOFF.md); the [architecture map](ARCHITECTURE.md) points to relevant files.
+
 Use Node.js **24 or newer** and npm. Install FFmpeg for transcription and integration checks. The server uses Node's built-in SQLite with no runtime npm dependencies; the frontend uses React, Vite and Base UI components.
 
 ```sh

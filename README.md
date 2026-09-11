@@ -145,6 +145,9 @@ Follow the [upgrade guide](docs/UPGRADING.md). Keep your existing `.env`, deploy
 
 ## Try a sample or contribute
 
+Working with ChatGPT/Codex or Claude? Use the [shared contributor workflow](docs/AI_WORKFLOW.md)
+and [current handoff](docs/HANDOFF.md) to continue development across assistants.
+
 The [development guide](docs/DEVELOPMENT.md) explains sample mode, local setup, source builds and checks. Sample mode needs no Audiobookshelf account or GPU and uses a short public-domain recording with prepared captions. It demonstrates listening and note taking, not automatic transcription quality.
 
 ## Storage and privacy
