@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only, via the src/debug source set. Lets a developer reach a
+     Margin server over plain http on a LAN while testing. Release builds keep
+     Android's default, which blocks cleartext, so a shipped app never sends the
+     bearer session token unencrypted. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
