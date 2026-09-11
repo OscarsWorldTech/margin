@@ -8,6 +8,10 @@ The player stays active when you click Library or the Margin logo. Click the boo
 
 The speed panel has presets and 0.05× / 0.1× adjustment steps. Speed and step size are remembered in this browser. Speeds range from 0.5× to 10×, subject to browser support; very high speeds can mute audio or reduce quality. The browser is asked to preserve pitch. Speed does not change the timestamps used for captions and sync.
 
+## Volume
+
+Use the speaker button to mute or unmute, and the adjacent volume-controls button for the 0–100% slider. Volume and mute are remembered in this browser. Raising the slider unmutes; unmuting from zero restores the last audible level. These controls remain available while browsing the library. Some mobile browsers require the device's physical volume buttons.
+
 ## Captions and notes
 
 Use Follow audio to keep the active passage visible. Searching or manually browsing passages turns following off. Only 80 passages render at once so long books remain responsive. Use Earlier/Later passages to browse.
