@@ -27,6 +27,17 @@
 
         </activity>
 
+        <!-- Keeps audio running with the screen off and owns the notification,
+             lock-screen and headset controls. -->
+        <service
+            android:name=".PlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -41,4 +52,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Playback continues with the screen off and while other apps are in front. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Android 13+ asks before showing the playback notification. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>
