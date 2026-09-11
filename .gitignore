@@ -47,3 +47,14 @@ next-env.d.ts
 
 /release/
 /.openai/
+
+# Private assistant notes and local settings
+/AGENTS.md
+/CLAUDE.md
+/CLAUDE.local.md
+/docs/AI_WORKFLOW.md
+/docs/ARCHITECTURE.md
+/docs/HANDOFF.md
+/docs/MOBILE.md
+/docs/LOCAL.md
+/.claude/settings.local.json
