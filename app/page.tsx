@@ -76,10 +76,15 @@ export default function Home(){
    const p=player.current??(player.current=createNativePlayer(path=>resolveServerPath(connection.base,path),connection.token));
    // The service is the source of truth: headset, lock screen and call interruptions
    // all change playback without the reader knowing.
+   let wasPlaying=false;
    return p.subscribe(s=>{
      if(s.error)setError(s.error);
      currentPosition.current=s.position;setPosition(s.position);setPlaying(s.playing);playIntent.current=s.playing;
-     if(s.playing)progress.current?.change(s.position);else void progress.current?.flush();
+     if(s.playing)progress.current?.change(s.position);
+     // Record and flush on a real stop, matching the browser's pause handler. Buffering
+     // snapshots are not pauses and must not trigger a write each time.
+     else if(wasPlaying){progress.current?.change(s.position);void progress.current?.flush();}
+     wasPlaying=s.playing;
    });
  },[native]);
  useEffect(()=>{if(status?.authenticated&&status.configured)api('/libraries').then(ls=>{setLibraries(ls);setLibrary(ls[0]?.id||'');}).catch(e=>setError(e.message));},[status]);

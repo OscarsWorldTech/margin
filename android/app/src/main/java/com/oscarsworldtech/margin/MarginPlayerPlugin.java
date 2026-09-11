@@ -1,6 +1,8 @@
 package com.oscarsworldtech.margin;
 
 import android.content.ComponentName;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
@@ -50,11 +52,35 @@ public class MarginPlayerPlugin extends Plugin {
         void run(MediaController controller);
     }
 
+    private final Handler ticker = new Handler(Looper.getMainLooper());
+
+    /**
+     * ExoPlayer reports events, not elapsed time, so nothing would move the scrubber or
+     * the read-along captions between a play and the next state change. The browser gets
+     * this for free from the audio element's timeupdate; this is the equivalent.
+     */
+    private final Runnable tick = new Runnable() {
+        @Override
+        public void run() {
+            MediaController current = controller;
+            if (current == null || !current.isPlaying()) return;
+            emit();
+            ticker.postDelayed(this, 250);
+        }
+    };
+
+    private void scheduleTicker() {
+        ticker.removeCallbacks(tick);
+        MediaController current = controller;
+        if (current != null && current.isPlaying()) ticker.postDelayed(tick, 250);
+    }
+
     private final Player.Listener playerListener = new Player.Listener() {
         @Override
         public void onEvents(Player player, Player.Events events) {
             // One notification per batch of changes rather than one per property.
             emit();
+            scheduleTicker();
         }
 
         @Override
@@ -259,6 +285,7 @@ public class MarginPlayerPlugin extends Plugin {
     @PluginMethod
     public void dispose(PluginCall call) {
         getActivity().runOnUiThread(() -> {
+            ticker.removeCallbacks(tick);
             MediaController current = controller;
             if (current != null) {
                 current.removeListener(playerListener);
@@ -272,6 +299,7 @@ public class MarginPlayerPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        ticker.removeCallbacks(tick);
         MediaController current = controller;
         if (current != null) {
             current.removeListener(playerListener);
