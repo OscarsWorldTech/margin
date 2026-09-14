@@ -14,11 +14,14 @@ test('each hardware configuration is complete and keeps storage and credentials 
   const version=spawnSync('docker',[...dockerArgs,'compose','version'],{encoding:'utf8',windowsHide:true});
   if(version.status!==0){t.skip('Docker Compose CLI is not installed.');return;}
   const configs={};
-  for(const filename of ['compose.yml','compose.cpu.yml','compose.nvidia.yml']){
+  for(const filename of ['compose.yml','compose.cpu.yml','compose.nvidia.yml','compose.prebuilt.yml','compose.prebuilt.cpu.yml','compose.prebuilt.nvidia.yml']){
     const result=spawnSync('docker',[...dockerArgs,'compose','--env-file','.env.example','-f',filename,'config','--format','json'],{cwd:root,encoding:'utf8',windowsHide:true});
     assert.equal(result.status,0,filename+' should validate');
     configs[filename]=JSON.parse(result.stdout);
     const {margin,whisper}=configs[filename].services;
+    assert.equal(margin.environment.ALLOW_INSECURE_HTTP,'false');
+    assert.equal(margin.environment.TRUSTED_PROXIES,'');
+    assert.equal(margin.environment.COOKIE_SECURE,'true');
     assert.equal(margin.environment.WHISPER_URL,'http://whisper:8080');
     assert.equal(margin.volumes[0].source,'margin-data');assert.equal(whisper.volumes[0].source,'whisper-models');
     assert.equal(whisper.ports,undefined,'inference stays private to the Docker network');

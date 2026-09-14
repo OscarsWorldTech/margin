@@ -40,19 +40,29 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
    return send(res,200,{segments:[{start:0,end:5,text:'A sentence worth keeping.'},{start:5,end:10,text:'Another thought.'}]});
  });
  const workerUrl=await listen(worker);const port=await unusedPort();const base='http://127.0.0.1:'+port;
- async function start(){processHandle=spawn(process.execPath,['server/index.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:folder,ABS_URL:absUrl+'/abs',ABS_TOKEN:'private-test-token',MARGIN_PASSWORD:'test-password',WHISPER_URL:workerUrl,DEMO_MODE:'false'},stdio:['ignore','pipe','pipe'],windowsHide:true});
+ async function start(){processHandle=spawn(process.execPath,['server/index.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:folder,ABS_URL:absUrl+'/abs',ABS_TOKEN:'private-test-token',MARGIN_PASSWORD:'test-password-long-unique',WHISPER_URL:workerUrl,DEMO_MODE:'false',ALLOW_INSECURE_HTTP:'false',COOKIE_SECURE:'auto',TRUSTED_PROXIES:'127.0.0.1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
    let output='';processHandle.stdout.on('data',d=>output+=d);processHandle.stderr.on('data',d=>output+=d);
    for(let i=0;i<100;i++){if(processHandle.exitCode!==null)throw new Error(output);try{if((await fetch(base+'/api/health')).ok)return;}catch{}await sleep(50);}throw new Error('Server did not start: '+output);
  }
  async function stop(){if(processHandle&&processHandle.exitCode===null){processHandle.kill();await once(processHandle,'exit');}}
  t.after(async()=>{await stop();await Promise.all([new Promise(r=>abs.close(r)),new Promise(r=>worker.close(r))]);if(!path.resolve(folder).startsWith(path.resolve(tmpdir())+path.sep+'margin-test-'))throw new Error('Unexpected temporary directory');await rm(folder,{recursive:true,force:true});});
  async function request(p,body,method){return fetch(base+'/api'+p,{method:method||(body===undefined?'GET':'POST'),headers:{Cookie:cookie,...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});}
- async function login(){const r=await request('/login',{password:'test-password'});assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0];}
- await start();assert.equal((await request('/books?library=lib1')).status,401);assert.equal((await request('/login',{password:'bad'})).status,401);await login();
+ async function login(){const r=await request('/login',{password:'test-password-long-unique'});assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0];}
+ await start();
+ const insecure=await new Promise((resolve,reject)=>{
+   const outgoing=http.request(base+'/api/login',{method:'POST',headers:{Host:'margin.example','Content-Type':'application/json'}},r=>{r.resume();r.on('end',()=>resolve({status:r.statusCode,cookie:r.headers['set-cookie']}));});
+   outgoing.on('error',reject);outgoing.end(JSON.stringify({password:'test-password-long-unique'}));
+ });
+ assert.equal(insecure.status,426,'external HTTP login is rejected');
+ assert.equal(insecure.cookie,undefined);
+ const tls=await fetch(base+'/api/login',{method:'POST',headers:{Host:'margin.example','X-Forwarded-Proto':'https','X-Forwarded-For':'198.51.100.20','Content-Type':'application/json'},body:JSON.stringify({password:'test-password-long-unique'})});
+ assert.equal(tls.status,200,'explicitly trusted TLS terminator is supported');
+ assert.match(tls.headers.get('set-cookie'),/; Secure/,'HTTPS cookies cannot be downgraded');
+ assert.equal((await request('/books?library=lib1')).status,401);assert.equal((await request('/login',{password:'bad'})).status,401);await login();
  const expectedVersion=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).version;
  assert.equal((await(await request('/status')).json()).version,expectedVersion);
  for(const route of ['/', '/index.html', '/reader']){
-   const shell=await fetch(base+route);assert.equal(shell.status,200);assert.equal(shell.headers.get('cache-control'),'no-store','HTML must not keep old frontend bundles after an upgrade');await shell.body.cancel();
+   const shell=await fetch(base+route);assert.equal(shell.status,200);assert.match(shell.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.match(shell.headers.get('permissions-policy'),/microphone=\(\)/);assert.equal(shell.headers.get('cache-control'),'no-store','HTML must not keep old frontend bundles after an upgrade');await shell.body.cancel();
  }
  assert.equal((await (await request('/libraries')).json())[0].id,'lib1');
  const list=await(await request('/books?library=lib1')).json();assert.equal(list.books[0].title,'Test book');assert.ok(!JSON.stringify(list).includes('private-test-token'));
@@ -87,11 +97,11 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
  // A packaged app runs on its own origin so the SameSite=Strict cookie is never sent, and a
  // background player cannot read that cookie at all. Both use a bearer token for the same session.
  const post=(p,headers,value)=>fetch(base+'/api'+p,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(value||{})});
- const nativeLogin=await post('/login',{},{password:'test-password',client:'native'});
+ const nativeLogin=await post('/login',{},{password:'test-password-long-unique',client:'native'});
  const native=await nativeLogin.json();
  assert.match(native.token,/^[a-f0-9]{64}$/,'a native sign-in returns a session token');
  assert.equal(nativeLogin.headers.get('set-cookie'),null,'a native session does not also set a browser cookie');
- assert.equal((await(await post('/login',{},{password:'test-password'})).json()).token,undefined,'a browser sign-in never exposes the token');
+ assert.equal((await(await post('/login',{},{password:'test-password-long-unique'})).json()).token,undefined,'a browser sign-in never exposes the token');
  assert.equal((await post('/login',{},{password:'bad',client:'native'})).status,401,'a native sign-in still needs the password');
  const bearer={Authorization:'Bearer '+native.token};
  assert.equal((await(await fetch(base+'/api/status',{headers:bearer})).json()).authenticated,true);
