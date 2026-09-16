@@ -87,6 +87,21 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
  await stop();await start();await login();const restored=await(await request('/books/book1')).json();assert.equal(restored.notes[0].id,note.id);
  assert.equal((await request('/books/book1/captions',{text:'1\n00:00:00,000 --> 00:00:02,000\nAn imported sentence.'})).status,200);
  assert.equal((await(await request('/books/book1')).json()).notes[0].quote,'Saved original passage.');
+ const originalCaptions=(await(await request('/books/book1')).json()).cues;
+ const readalong={title:'Synthetic EPUB',cues:[{start:0,end:2,text:'Original ebook wording.',anchor:'chapter#sentence'}]};
+ assert.equal((await fetch(base+'/api/books/book1/readalong',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(readalong)})).status,401);
+ assert.equal((await request('/books/book1/readalong',{...readalong,cues:[{...readalong.cues[0],end:99}]})).status,400);
+ assert.equal((await request('/books/book1/readalong',readalong)).status,200);
+ await stop();await start();await login();
+ const imported=await(await request('/books/book1')).json();
+ assert.deepEqual(imported.readalong,readalong,'import survives restart');
+ assert.equal((await(await request('/books?library=lib1')).json()).books[0].status,'readalong');
+ assert.deepEqual(imported.cues,originalCaptions,'original captions are preserved');
+ assert.equal(imported.notes[0].quote,'Saved original passage.','saved quotations are preserved');
+ assert.equal((await request('/books/book1/readalong',{title:'bad',cues:[]})).status,400);
+ assert.deepEqual((await(await request('/books/book1')).json()).readalong,readalong,'failed replacement leaves previous import intact');
+ assert.equal((await request('/books/book1/readalong',{},'DELETE')).status,200);
+ assert.equal((await(await request('/books/book1')).json()).readalong,null);
  if(process.env.FFMPEG_PATH){
    assert.equal((await request('/books/book1/transcribe',{})).status,202);
    async function waitFor(status){for(let i=0;i<150;i++){const r=await(await request('/books/book1/captions')).json();if(r.job?.status===status)return r;if(r.job?.status==='failed'&&status!=='failed')throw new Error(r.job.message);await sleep(100);}throw Error('Job timeout: '+status);}
