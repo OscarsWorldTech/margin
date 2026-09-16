@@ -1,5 +1,10 @@
 # Margin
 
+**Storyteller read-along import:** source builds with this feature can use the
+original book text and timestamps from an aligned EPUB, alongside existing audio
+captions and notes. See [importing a Storyteller readaloud](docs/STORYTELLER.md) for
+setup, recording checks, and current limitations.
+
 Listen to your Audiobookshelf library with captions, highlight a sentence, and save a note linked to that moment in the audio. Margin runs on your own Docker host and generates captions locally with whisper.cpp.
 
 ![Margin reader with sample captions and a saved note](docs/screenshots/reader.png)

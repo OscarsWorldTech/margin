@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { number, parseCaptions, whisperCues, sentences, markdown, byteRange } from './captions.mjs';
 import {securityConfig,requestSecurity,validatePassword,browserPolicies,LoginLimiter} from './security.mjs';
+import {validateReadalong} from './readalong.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {version}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -18,6 +19,7 @@ await mkdir(path.join(data,'cache'),{recursive:true});
 const db=new DatabaseSync(path.join(data,'margin.sqlite'));
 db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS captions(book TEXT PRIMARY KEY,cues TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS readalongs(book TEXT PRIMARY KEY,content TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,book TEXT NOT NULL,start REAL NOT NULL,end REAL NOT NULL,quote TEXT NOT NULL,note TEXT NOT NULL,color TEXT NOT NULL,created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_notes_book_start ON notes(book,start);
 CREATE TABLE IF NOT EXISTS jobs(book TEXT PRIMARY KEY,status TEXT NOT NULL,progress REAL NOT NULL DEFAULT 0,message TEXT NOT NULL DEFAULT '',chunks TEXT NOT NULL DEFAULT '{}');
@@ -56,6 +58,7 @@ async function abs(relative,options){return (await upstream(relative,options)).j
 function noteList(book){return db.prepare('SELECT * FROM notes WHERE book=? ORDER BY start,created').all(book);}
 function job(book){return db.prepare('SELECT book,status,progress,message FROM jobs WHERE book=?').get(book)||null;}
 function readCues(book){const r=db.prepare('SELECT cues FROM captions WHERE book=?').get(book);return r?JSON.parse(r.cues):[];}
+function readalong(book){const r=db.prepare('SELECT content FROM readalongs WHERE book=?').get(book);return r?JSON.parse(r.content):null;}
 function storeCues(book,cues){db.prepare('INSERT INTO captions VALUES (?,?) ON CONFLICT(book) DO UPDATE SET cues=excluded.cues').run(book,JSON.stringify(cues));}
 async function demoBook(){return JSON.parse(await readFile(path.join(root,'public/demo.json'),'utf8'));}
 async function readPosition(book,duration){
@@ -163,7 +166,7 @@ const server=http.createServer(async(req,res)=>{
       if(demo){const b=await demoBook();return json(res,200,{books:[{...publicBook(b),status:'done'}],total:1});}
       const library=id(url.searchParams.get('library'));const page=number(url.searchParams.get('page')||0,0,100000);
       const result=await abs(`/api/libraries/${library}/items?limit=100&page=${page}&minified=1`);
-      const books=result.results.filter(b=>b.mediaType==='book'&&b.media?.numAudioFiles!==0).map(b=>({id:b.id,title:b.media.metadata.title,author:b.media.metadata.authorName||'',duration:b.media.duration||0,cover:`/api/books/${b.id}/cover`,status:job(b.id)?.status||(readCues(b.id).length?'done':null)}));
+      const books=result.results.filter(b=>b.mediaType==='book'&&b.media?.numAudioFiles!==0).map(b=>({id:b.id,title:b.media.metadata.title,author:b.media.metadata.authorName||'',duration:b.media.duration||0,cover:`/api/books/${b.id}/cover`,status:db.prepare('SELECT 1 FROM readalongs WHERE book=?').get(b.id)?'readalong':job(b.id)?.status||(readCues(b.id).length?'done':null)}));
       return json(res,200,{books,total:result.total});
     }
     if(p==='/api/engine'){
@@ -176,7 +179,19 @@ const server=http.createServer(async(req,res)=>{
       if(action===''){
         const b=await bookDetails(book);const cues=demo?(await demoBook()).cues:readCues(book);
         const position=await readPosition(book,b.duration);
-        return json(res,200,{...publicBook(b),position,cues,notes:noteList(book),job:job(book)});
+        return json(res,200,{...publicBook(b),position,cues,readalong:readalong(book),notes:noteList(book),job:job(book)});
+      }
+      if(action==='readalong'&&req.method==='POST'){
+        if(demo)throw failure('Import a readaloud after connecting your own library.');
+        const b=await bookDetails(book);
+        const content=validateReadalong(await body(req),b.duration);
+        db.prepare('INSERT INTO readalongs VALUES (?,?) ON CONFLICT(book) DO UPDATE SET content=excluded.content').run(book,JSON.stringify(content));
+        return json(res,200,content);
+      }
+      if(action==='readalong'&&req.method==='DELETE'){
+        if(demo)throw failure('The sample cannot be changed.');
+        await bookDetails(book);db.prepare('DELETE FROM readalongs WHERE book=?').run(book);
+        return json(res,200,{ok:true});
       }
       if(action==='captions'&&req.method==='GET')return json(res,200,{cues:demo?(await demoBook()).cues:readCues(book),job:job(book)});
       if(action==='captions'&&req.method==='POST'){
