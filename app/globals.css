@@ -63,3 +63,12 @@
    it a real hover shade only where a pointer can actually hover. */
 .transport .play-button:hover{background:#7fdac0}
 @media(hover:hover){.transport .play-button:hover{background:#6fcfb3}}
+
+.text-source{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 24px 12px;font-size:13px}.text-source small{color:#627585}
+.readalong-dialog[data-slot=dialog-content]{width:min(700px,calc(100vw - 24px));max-width:700px;max-height:90dvh;overflow-y:auto}
+.readalong-dialog p,.readalong-dialog label,.readalong-dialog details{font-size:14px;line-height:1.5}
+.readalong-file{display:grid;gap:8px}.readalong-mapping{display:grid;gap:12px;max-height:35dvh;overflow-y:auto;padding:2px}
+.readalong-mapping section{border:1px solid #496071;border-radius:8px;padding:12px;display:grid;gap:8px;min-width:0}
+.readalong-mapping strong{overflow-wrap:anywhere}.readalong-mapping small{opacity:.8}.readalong-mapping label{display:grid;gap:6px}
+.readalong-mapping blockquote{font-family:Georgia,serif;font-size:17px;line-height:1.5;border-left:2px solid #7fdac0;padding-left:12px;max-height:100px;overflow:auto}
+.readalong-confirm{display:flex;gap:10px;align-items:flex-start}.readalong-confirm input{margin-top:5px;flex-shrink:0}.readalong-error{color:#e88b82}
