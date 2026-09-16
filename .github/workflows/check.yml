@@ -14,12 +14,12 @@ jobs:
   application:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm run build
       - run: npm test
@@ -43,7 +43,7 @@ jobs:
           - backend: cuda
             dockerfile: docker/whisper.cuda.Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - run: docker build -f '${{ matrix.dockerfile }}' -t margin-worker-check .
       - name: CPU inference smoke check
         if: matrix.backend == 'cpu'

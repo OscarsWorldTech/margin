@@ -14,6 +14,10 @@ Listen to your Audiobookshelf library with captions, highlight a sentence, and s
 
 Margin is an early, single-user application. Everyone using its password shares one library, notes collection, and Audiobookshelf account. It connects to an existing Audiobookshelf server; it does not replace one.
 
+## Network security
+
+For network access, configure HTTPS using [the HTTPS guide](docs/HTTPS.md). Development builds containing the security-hardening patch reject network HTTP unless explicitly acknowledged, and require a unique password of at least 16 characters. Older published images still need HTTPS even though they do not enforce it. See [hardening status](docs/SECURITY_HARDENING.md) for release availability.
+
 ## Before you install
 
 You need:
@@ -37,15 +41,17 @@ These are **preview images** containing the latest development changes. The exis
 | Intel / experimental AMD (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-vulkan` |
 | NVIDIA (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cuda` |
 
-For a first CPU installation:
+For a first CPU installation, configure your HTTPS proxy and its exact `TRUSTED_PROXIES` address using the guide above, then:
 
 1. Create an Audiobookshelf API key using the [instructions below](#3-create-your-audiobookshelf-api-key).
 2. Create a file named `margin.env` in your installation folder with these values. For this Docker `--env-file` format, **do not put quotes around the values**:
 
    ```dotenv
-   ABS_URL=http://YOUR-AUDIOBOOKSHELF-HOST:13378
+   ABS_URL=https://YOUR-AUDIOBOOKSHELF-HOST
    ABS_TOKEN=YOUR-API-KEY
    MARGIN_PASSWORD=CHOOSE-A-LONG-UNIQUE-PASSWORD
+   TRUSTED_PROXIES=YOUR_EXACT_PROXY_PEER_IP
+   COOKIE_SECURE=true
    WHISPER_MODEL=small.en
    WHISPER_LANGUAGE=en
    ```
@@ -58,15 +64,15 @@ For a first CPU installation:
    docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cpu
    docker run -d --name margin --restart unless-stopped \
      --env-file margin.env \
-     -p 8787:8787 \
+     -p 127.0.0.1:8787:8787 \
      -v margin-data:/data \
      -v whisper-models:/models \
      ghcr.io/oscarsworldtech/margin:preview-aio-cpu
    ```
 
-4. Follow `docker logs -f margin` until the first model download and Whisper startup finish. Open **http://YOUR-DOCKER-HOST:8787**, sign in with your Margin password, open a book, and choose **Generate captions**.
+4. Follow `docker logs -f margin` until the first model download and Whisper startup finish. Open **your configured HTTPS address**, sign in with your Margin password, open a book, and choose **Generate captions**.
 
-This publishes port 8787 on the host's network interfaces. Use `-p 127.0.0.1:8787:8787` for host-only access. Saved captions and notes live in `margin-data`; models live in `whisper-models`. Keep both volumes when updating.
+This publishes port 8787 on host loopback for your same-host HTTPS proxy. Saved captions and notes live in `margin-data`; models live in `whisper-models`. Keep both volumes when updating.
 
 Intel and NVIDIA need additional GPU options. The [all-in-one guide](docs/ALL_IN_ONE.md) includes those options, single-container Compose files, updates, diagnostics, and migration from the previous two-container setup. Existing installations should follow that guide to reuse their actual volume names.
 
@@ -101,15 +107,15 @@ Older Audiobookshelf versions expose a user API token under the user's settings 
 Open `.env` in a text editor and replace these values:
 
 ```dotenv
-ABS_URL=http://YOUR-AUDIOBOOKSHELF-HOST:13378
+ABS_URL=https://YOUR-AUDIOBOOKSHELF-HOST
 ABS_TOKEN='YOUR-API-KEY'
 MARGIN_PASSWORD='CHOOSE-A-LONG-UNIQUE-PASSWORD'
-BIND_ADDRESS=0.0.0.0
+BIND_ADDRESS=127.0.0.1
 ```
 
 - `ABS_URL` must be reachable **from inside Docker**. Include the full subpath if your server uses one. `localhost` inside Margin means the Margin container, not your Audiobookshelf host.
 - `MARGIN_PASSWORD` is the password for opening Margin, not your Audiobookshelf password. Single quotes preserve literal characters such as `$` and `#`; avoid a literal single quote in this value.
-- `BIND_ADDRESS=0.0.0.0` allows other devices on your network to reach port 8787. For access only from the Docker host, keep `127.0.0.1` instead. Use your VPN or HTTPS reverse proxy for remote access.
+- Keep `BIND_ADDRESS=127.0.0.1` for a same-host proxy. Configure `TRUSTED_PROXIES`, `COOKIE_SECURE=true`, and your external `ALLOWED_ORIGINS` as described in the HTTPS guide. A different-host proxy needs a restricted bind address/firewall.
 
 Keep the hardware selection written by setup.sh and `MARGIN_VERSION=v0.1.5`. For non-English audio, choose a multilingual model such as `small` and set `WHISPER_LANGUAGE=auto` or a language code. Sentence splitting currently follows English punctuation conventions.
 
@@ -127,7 +133,7 @@ The first startup downloads the selected model. Wait for Whisper to start its se
 sh doctor.sh
 ```
 
-Open **http://YOUR-DOCKER-HOST:8787** in your browser and sign in with your Margin password. If the browser cannot connect, check the bind address, host firewall and whether both containers are running. If the library cannot load, check `ABS_URL`, the API key, and the selected user's permissions. Restart Margin after editing `.env` with `docker compose up -d`.
+Open **your configured HTTPS address** in your browser and sign in with your Margin password. If the browser cannot connect, check the bind address, host firewall and whether both containers are running. If the library cannot load, check `ABS_URL`, the API key, and the selected user's permissions. Restart Margin after editing `.env` with `docker compose up -d`.
 
 ### 6. Transcribe your first book
 
@@ -151,7 +157,7 @@ The [development guide](docs/DEVELOPMENT.md) explains sample mode, local setup, 
 
 `margin-data` holds the SQLite database and temporary transcription audio. `whisper-models` holds downloaded models. Back up the data volume while Margin is stopped, or use a SQLite-aware backup. Completed source tracks are removed from the cache; paused or failed transcription may retain its current track until it can resume.
 
-Audio is sent to your local transcription worker. Installation and the initial model download require internet access. Notes are stored in Margin rather than Audiobookshelf. Sessions expire after seven days or a server restart. For HTTPS, set `COOKIE_SECURE=true`; if a reverse proxy changes the Host header, configure `ALLOWED_ORIGINS` for your external origin.
+Audio is sent to your local transcription worker. Installation and the initial model download require internet access. Notes are stored in Margin rather than Audiobookshelf. Sessions expire after seven days or a server restart. Configure HTTPS proxy trust and cookie behavior using [the HTTPS guide](docs/HTTPS.md); an allowed origin alone does not verify transport security.
 
 ## Sources and credits
 

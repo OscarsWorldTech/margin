@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { number, parseCaptions, whisperCues, sentences, markdown, byteRange } from './captions.mjs';
+import {securityConfig,requestSecurity,validatePassword,browserPolicies,LoginLimiter} from './security.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {version}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -28,7 +29,8 @@ const absBase=(process.env.ABS_URL||'').replace(/\/$/,'');
 const absToken=process.env.ABS_TOKEN||'';
 const whisperBase=(process.env.WHISPER_URL||'http://whisper:8080').replace(/\/$/,'');
 const password=process.env.MARGIN_PASSWORD||'';
-if(!demo&&!password) throw new Error('Set MARGIN_PASSWORD before starting Margin. Use DEMO_MODE=true only for the local sample.');
+if(!demo)validatePassword(password);
+const security=securityConfig(process.env);
 const sessions=new Map(), queue=[], cancel=new Set(); let working=false;
 function failure(message,status=400){const e=new Error(message);e.status=status;return e;}
 function id(value){if(!/^[a-zA-Z0-9_-]{1,150}$/.test(value||''))throw failure('Invalid book identifier');return value;}
@@ -121,24 +123,30 @@ async function streamFile(req,res,file,type){
   if(range.partial)headers['Content-Range']=`bytes ${range.start}-${range.end}/${s.size}`;
   res.writeHead(range.partial?206:200,headers);if(req.method==='HEAD')return res.end();await pipeline(createReadStream(file,{start:range.start,end:range.end}),res);
 }
-const attempts=new Map();
+const attempts=new LoginLimiter();
 const server=http.createServer(async(req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');
+  for(const [header,value] of Object.entries(browserPolicies))res.setHeader(header,value);
   const url=new URL(req.url,'http://local');const p=url.pathname;
   try {
     if(p==='/api/health')return json(res,200,{ok:true});
+    const transport=requestSecurity(req,security);
+    if(!demo&&!transport.allowed)throw failure('HTTPS is required. Configure an HTTPS reverse proxy and TRUSTED_PROXIES, or explicitly acknowledge private-network HTTP with ALLOW_INSECURE_HTTP=true. See docs/HTTPS.md.',426);
     if(!['GET','HEAD'].includes(req.method)){
       const origin=req.headers.origin;const allowed=new Set([`http://${req.headers.host}`,`https://${req.headers.host}`,...(process.env.ALLOWED_ORIGINS||'').split(',')]);
       if(req.headers['sec-fetch-site']==='cross-site'||(origin&&!allowed.has(origin)))throw failure('Request origin is not allowed.',403);
     }
     if(p==='/api/login'&&req.method==='POST'){
-      const remote=req.socket.remoteAddress;const a=attempts.get(remote)||{n:0,until:Date.now()+60000};
-      if(a.until<Date.now()){a.n=0;a.until=Date.now()+60000;}a.n++;attempts.set(remote,a);if(a.n>10)throw failure('Too many attempts. Try again in a minute.',429);
-      const input=await body(req,4096);if(!demo&&!safeEqual(String(input.password||''),password))throw failure('Incorrect password.',401);
+      const remote=transport.client;const retry=attempts.take(remote);
+      if(retry){res.setHeader('Retry-After',String(retry));throw failure('Too many attempts. Try again later.',429);}
+      const input=await body(req,4096);if(!demo&&!safeEqual(String(input.password||''),password)){attempts.failed(remote);throw failure('Incorrect password.',401);}
+      attempts.succeeded(remote);
+      for(const [key,expires] of sessions)if(expires<=Date.now())sessions.delete(key);
+      if(sessions.size>=1024)throw failure('Too many active sessions. Sign out of unused sessions or restart Margin.',503);
       const token=randomBytes(32).toString('hex');sessions.set(token,Date.now()+7*86400000);
       // Native clients keep the token themselves. Browsers only ever receive the cookie.
       if(input.client==='native')return json(res,200,{ok:true,token});
-      res.setHeader('Set-Cookie',`margin_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${process.env.COOKIE_SECURE==='true'?'; Secure':''}`);
+      res.setHeader('Set-Cookie',`margin_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${transport.secureCookie?'; Secure':''}`);
       return json(res,200,{ok:true});
     }
     // A packaged app runs on its own origin, so the SameSite=Strict cookie is never sent and
@@ -149,7 +157,7 @@ const server=http.createServer(async(req,res)=>{
     const authenticated=demo||Boolean(token);
     if(p==='/api/status')return json(res,200,{authenticated,demo,configured:demo||Boolean(absBase&&absToken),version});
     if(p.startsWith('/api/')&&!authenticated)throw failure('Sign in to continue.',401);
-    if(p==='/api/logout'&&req.method==='POST'){sessions.delete(token);res.setHeader('Set-Cookie','margin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');return json(res,200,{ok:true});}
+    if(p==='/api/logout'&&req.method==='POST'){sessions.delete(token);res.setHeader('Set-Cookie','margin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'+(transport.secureCookie?'; Secure':''));return json(res,200,{ok:true});}
     if(p==='/api/libraries'){return json(res,200,demo?[{id:'sample',name:'Sample library'}]:(await abs('/api/libraries')).libraries.filter(l=>l.mediaType==='book'));}
     if(p==='/api/books'){
       if(demo){const b=await demoBook();return json(res,200,{books:[{...publicBook(b),status:'done'}],total:1});}

@@ -1,5 +1,9 @@
 # Upgrading Margin
 
+When upgrading to an image containing the security-hardening changes, first follow
+[the HTTPS/password migration guide](HTTPS.md). Existing network HTTP installations
+will receive 426 until configured for HTTPS or explicitly allowed private HTTP.
+
 For an all-in-one container, follow [its update and migration instructions](ALL_IN_ONE.md#persistent-data-and-updates). The commands below refer to the separate app and worker installation.
 
 Pause active transcription before replacing its worker. Back up `margin-data` while Margin is stopped, or use a SQLite-aware backup.

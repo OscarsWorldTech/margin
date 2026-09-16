@@ -30,6 +30,8 @@ For NVIDIA, use the CUDA image and add:
 
 Substitute the appropriate render node or NVIDIA device on multi-GPU hosts. Drivers and passthrough must already work inside the Docker host or VM. The image cannot install the host GPU driver.
 
+Before network access, configure [HTTPS and proxy trust](HTTPS.md). Older published images do not enforce the new defaults; only images explicitly containing the hardening patch do.
+
 ## Install with Compose
 
 The repository and future installation bundles include three complete, single-container configurations: `compose.aio.cpu.yml`, `compose.aio.intel.yml` (also usable for experimental AMD Vulkan), and `compose.aio.nvidia.yml`.
@@ -37,10 +39,13 @@ The repository and future installation bundles include three complete, single-co
 Create a `.env` alongside the chosen file:
 
 ```dotenv
-ABS_URL=http://YOUR-AUDIOBOOKSHELF-HOST:13378
+ABS_URL=https://YOUR-AUDIOBOOKSHELF-HOST
 ABS_TOKEN='YOUR-API-KEY'
 MARGIN_PASSWORD='CHOOSE-A-LONG-UNIQUE-PASSWORD'
-BIND_ADDRESS=0.0.0.0
+BIND_ADDRESS=127.0.0.1
+TRUSTED_PROXIES=YOUR_EXACT_PROXY_PEER_IP
+COOKIE_SECURE=true
+ALLOW_INSECURE_HTTP=false
 MARGIN_AIO_VERSION=preview
 WHISPER_MODEL=small.en
 WHISPER_LANGUAGE=en
@@ -73,7 +78,7 @@ docker inspect margin --format '{{.State.Health.Status}}'
 docker exec margin node /app/docker/all-in-one-health.mjs
 ```
 
-The app's Connections & timing dialog can also check the engine. Do not publish port 8080; it is internal. For HTTPS reverse proxies, add `COOKIE_SECURE=true` and any required `ALLOWED_ORIGINS` to the environment file.
+The app's Connections & timing dialog can also check the engine. Do not publish port 8080; it is internal. For HTTPS, configure the exact proxy peer in `TRUSTED_PROXIES` and any required `ALLOWED_ORIGINS`; see [HTTPS setup](HTTPS.md).
 
 ## Persistent data and updates
 
