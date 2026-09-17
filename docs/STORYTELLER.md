@@ -6,8 +6,7 @@ is available in source builds containing the Storyteller import change; older
 published images do not gain it until a new image is published.
 
 You need the aligned EPUB and the **same audiobook edition** in Audiobookshelf.
-A normal EPUB has no audio timings and cannot be imported this way. Margin does
-not perform ebook alignment itself yet.
+A normal EPUB has no audio timings and cannot be imported this way. For a normal EPUB, use [built-in ebook alignment](EBOOKS.md) instead.
 
 1. In Storyteller, finish aligning your ebook and audiobook, then download the
    resulting readaloud EPUB.

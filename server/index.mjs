@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { number, parseCaptions, whisperCues, sentences, markdown, byteRange } from './captions.mjs';
 import {securityConfig,requestSecurity,validatePassword,browserPolicies,LoginLimiter} from './security.mjs';
 import {validateReadalong} from './readalong.mjs';
+import {AlignmentJobs} from './alignment-jobs.mjs';
+import {processEbook} from './ebooks.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {version}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -119,7 +121,14 @@ async function transcribe(book){
   }
   setJob(book,'done',1,'Captions ready');
 }
-async function pump(){if(working)return;working=true;while(queue.length){const book=queue.shift();cancel.delete(book);try{await transcribe(book);}catch(e){if(e.message!=='paused')console.error('Transcription job failed:',book,e.message);const previous=job(book);setJob(book,e.message==='paused'?'paused':'failed',previous?.progress||0,e.message==='paused'?'Paused. Completed sections are saved.':(e.status?e.message:'Transcription failed. Check the engine, network, disk space, and model. Resume to retry.'));}}working=false;}
+function queueTranscription(book){
+  const previous=job(book);
+  if(previous&&['running','queued'].includes(previous.status))return;
+  db.prepare("INSERT INTO jobs(book,status) VALUES (?,'queued') ON CONFLICT(book) DO UPDATE SET status='queued',message='Waiting for the transcription engine'").run(book);
+  queue.push(book);void pump();
+}
+const alignment=new AlignmentJobs(db,{directory:demo?'':process.env.EBOOK_DIR,bookDetails,readCues,transcription:job,queueTranscription});
+async function pump(){if(working)return;working=true;while(queue.length){const book=queue.shift();cancel.delete(book);try{await transcribe(book);}catch(e){if(e.message!=='paused')console.error('Transcription job failed:',book,e.message);const previous=job(book);setJob(book,e.message==='paused'?'paused':'failed',previous?.progress||0,e.message==='paused'?'Paused. Completed sections are saved.':(e.status?e.message:'Transcription failed. Check the engine, network, disk space, and model. Resume to retry.'));}alignment.transcriptionFinished(book);}working=false;}
 async function streamFile(req,res,file,type){
   const s=await stat(file);let range;try{range=byteRange(req.headers.range,s.size);}catch{res.writeHead(416,{'Content-Range':`bytes */${s.size}`});return res.end();}
   const headers={'Content-Type':type,'Accept-Ranges':'bytes','Content-Length':range.end-range.start+1,'Cache-Control':type.startsWith('text/html')?'no-store':'private, max-age=3600'};
@@ -173,13 +182,30 @@ const server=http.createServer(async(req,res)=>{
       if(demo)return json(res,200,{ok:false,message:'Sample mode — no transcription engine connected.'});
       try{const r=await fetch(whisperBase+'/health',{signal:AbortSignal.timeout(5000)});return json(res,200,{ok:r.ok,message:r.ok?'Transcription engine is reachable. Check its logs to confirm Intel GPU use.':'Engine is not ready.'});}catch{return json(res,200,{ok:false,message:'Transcription engine is unreachable. Check WHISPER_URL and the worker container.'});}
     }
+    if(p==='/api/ebooks'&&req.method==='GET')return json(res,200,alignment.library.list());
+    if(p==='/api/ebooks/scan'&&req.method==='POST')return json(res,200,await alignment.library.scan());
+    const ebookMatch=/^\/api\/ebooks\/([a-f0-9]{64})$/.exec(p);
+    if(ebookMatch&&req.method==='GET'){
+      const selected=await alignment.library.resolve(ebookMatch[1]);
+      return json(res,200,{id:selected.id,name:selected.name,...await processEbook(selected.file)});
+    }
     const match=/^\/api\/books\/([a-zA-Z0-9_-]+)(?:\/(.*))?$/.exec(p);
     if(match){
       const book=id(match[1]),action=match[2]||'';
       if(action===''){
         const b=await bookDetails(book);const cues=demo?(await demoBook()).cues:readCues(book);
         const position=await readPosition(book,b.duration);
-        return json(res,200,{...publicBook(b),position,cues,readalong:readalong(book),notes:noteList(book),job:job(book)});
+        return json(res,200,{...publicBook(b),position,cues,readalong:readalong(book),alignment:alignment.status(book),notes:noteList(book),job:job(book)});
+      }
+      if(action==='alignment'&&req.method==='GET'){await bookDetails(book);return json(res,200,alignment.status(book));}
+      if(action==='alignment'&&req.method==='POST'){
+        if(demo)throw failure('Connect your library before pairing an ebook.');
+        const input=await body(req,4096);return json(res,202,await alignment.start(book,String(input.ebook||'')));
+      }
+      if(action==='alignment/result'&&req.method==='GET'){await bookDetails(book);return json(res,200,alignment.result(book));}
+      if(action==='alignment/accept'&&req.method==='POST'){
+        if(demo)throw failure('The sample cannot be changed.');
+        return json(res,200,await alignment.accept(book));
       }
       if(action==='readalong'&&req.method==='POST'){
         if(demo)throw failure('Import a readaloud after connecting your own library.');
@@ -208,7 +234,7 @@ const server=http.createServer(async(req,res)=>{
         queue.push(book);void pump();return json(res,202,job(book));
       }
       if(action==='pause'&&req.method==='POST'){
-        const i=queue.indexOf(book);if(i>=0){queue.splice(i,1);setJob(book,'paused',job(book)?.progress||0,'Paused');}else cancel.add(book);
+        const i=queue.indexOf(book);if(i>=0){queue.splice(i,1);setJob(book,'paused',job(book)?.progress||0,'Paused');alignment.transcriptionFinished(book);}else cancel.add(book);
         return json(res,200,{ok:true,message:'Will pause after the current section finishes.'});
       }
       if(action==='position'&&req.method==='GET'){
