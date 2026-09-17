@@ -3,16 +3,18 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {once} from 'node:events';
 import {spawn} from 'node:child_process';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,mkdir,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {storytellerFixture} from './storyteller-fixture.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function listen(server){server.listen(0,'127.0.0.1');await once(server,'listening');return 'http://127.0.0.1:'+server.address().port;}
 async function unusedPort(){const s=http.createServer();await listen(s);const p=s.address().port;await new Promise(r=>s.close(r));return p;}
 test('Audiobookshelf integration: authentication, streaming, notes, exports, persistence and resumable transcription',{timeout:45000},async t=>{
  const folder=await mkdtemp(path.join(tmpdir(),'margin-test-'));const wav=await readFile(path.join(root,'public/demo.wav'));
+ const ebookDirectory=path.join(folder,'ebooks');await mkdir(ebookDirectory);await writeFile(path.join(ebookDirectory,'Test book.epub'),Buffer.from(await(await storytellerFixture({'EPUB/text/ch1.xhtml':'<html><body><p>An imported sentence.</p></body></html>'})).arrayBuffer()));
  const received=[];let inference=0,failSecond=true,processHandle,cookie='',remoteTime=13,progressStatus=200;
  const send=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(obj));};
  const abs=http.createServer(async(req,res)=>{
@@ -40,7 +42,7 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
    return send(res,200,{segments:[{start:0,end:5,text:'A sentence worth keeping.'},{start:5,end:10,text:'Another thought.'}]});
  });
  const workerUrl=await listen(worker);const port=await unusedPort();const base='http://127.0.0.1:'+port;
- async function start(){processHandle=spawn(process.execPath,['server/index.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:folder,ABS_URL:absUrl+'/abs',ABS_TOKEN:'private-test-token',MARGIN_PASSWORD:'test-password-long-unique',WHISPER_URL:workerUrl,DEMO_MODE:'false',ALLOW_INSECURE_HTTP:'false',COOKIE_SECURE:'auto',TRUSTED_PROXIES:'127.0.0.1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
+ async function start(){processHandle=spawn(process.execPath,['server/index.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:folder,EBOOK_DIR:ebookDirectory,ABS_URL:absUrl+'/abs',ABS_TOKEN:'private-test-token',MARGIN_PASSWORD:'test-password-long-unique',WHISPER_URL:workerUrl,DEMO_MODE:'false',ALLOW_INSECURE_HTTP:'false',COOKIE_SECURE:'auto',TRUSTED_PROXIES:'127.0.0.1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
    let output='';processHandle.stdout.on('data',d=>output+=d);processHandle.stderr.on('data',d=>output+=d);
    for(let i=0;i<100;i++){if(processHandle.exitCode!==null)throw new Error(output);try{if((await fetch(base+'/api/health')).ok)return;}catch{}await sleep(50);}throw new Error('Server did not start: '+output);
  }
@@ -102,6 +104,21 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
  assert.deepEqual((await(await request('/books/book1')).json()).readalong,readalong,'failed replacement leaves previous import intact');
  assert.equal((await request('/books/book1/readalong',{},'DELETE')).status,200);
  assert.equal((await(await request('/books/book1')).json()).readalong,null);
+ assert.equal((await fetch(base+'/api/ebooks')).status,401);
+ const scanned=await(await request('/ebooks/scan',{})).json();assert.equal(scanned.books.length,1);const ebookId=scanned.books[0].id;
+ const preview=await(await request('/ebooks/'+ebookId)).json();assert.equal(preview.title,'A synthetic readaloud');
+ assert.equal((await request('/books/book1/alignment',{ebook:'../outside.epub'})).status,404);
+ assert.equal((await request('/books/book1/alignment',{ebook:ebookId})).status,202);
+ let aligned;
+ for(let i=0;i<100;i++){aligned=await(await request('/books/book1/alignment')).json();if(aligned.status==='review')break;if(aligned.status==='failed')throw Error(aligned.message);await sleep(50);}
+ assert.equal(aligned.status,'review');assert.equal(inference,0,'completed imported captions are reused without Whisper');
+ const proposed=await(await request('/books/book1/alignment/result')).json();assert.equal(proposed.summary.matched,1);
+ assert.equal((await(await request('/books/book1')).json()).readalong,null,'alignment does not activate before review');
+ await stop();await start();await login();
+ assert.equal((await(await request('/books/book1/alignment')).json()).status,'review','review survives restart');
+ assert.equal((await request('/books/book1/alignment/accept',{})).status,200);
+ const activated=await(await request('/books/book1')).json();assert.equal(activated.readalong.cues[0].text,'An imported sentence.');
+ assert.deepEqual(activated.cues,originalCaptions);assert.equal(activated.notes[0].quote,'Saved original passage.');
  if(process.env.FFMPEG_PATH){
    assert.equal((await request('/books/book1/transcribe',{})).status,202);
    async function waitFor(status){for(let i=0;i<150;i++){const r=await(await request('/books/book1/captions')).json();if(r.job?.status===status)return r;if(r.job?.status==='failed'&&status!=='failed')throw new Error(r.job.message);await sleep(100);}throw Error('Job timeout: '+status);}

@@ -61,6 +61,21 @@ test('each hardware configuration is complete and keeps storage and credentials 
   }
 });
 
+test('ebook overlay preserves existing volumes and mounts the library read-only',t=>{
+  const dockerArgs=process.env.DOCKER_CONFIG?['--config',process.env.DOCKER_CONFIG]:[];
+  if(spawnSync('docker',[...dockerArgs,'compose','version'],{windowsHide:true}).status!==0){t.skip('Docker Compose CLI is not installed.');return;}
+  for(const file of ['compose.cpu.yml','compose.aio.intel.yml','compose.prebuilt.yml','compose.prebuilt.cpu.yml','compose.prebuilt.nvidia.yml']){
+    const result=spawnSync('docker',[...dockerArgs,'compose','--env-file','.env.example','-f',file,'-f','compose.ebooks.yml','config','--format','json'],{cwd:root,env:{...process.env,EBOOK_DIRECTORY:root},encoding:'utf8',windowsHide:true});
+    assert.equal(result.status,0,result.stderr);
+    const app=JSON.parse(result.stdout).services.margin;
+    const mount=app.volumes.find(v=>v.target==='/books');
+    assert.equal(mount.type,'bind');assert.equal(mount.read_only,true);assert.equal(mount.bind?.create_host_path??false,false);
+    assert.ok(app.volumes.some(v=>v.source==='margin-data'&&v.target==='/data'));
+    if(file.includes('aio'))assert.ok(app.volumes.some(v=>v.source==='whisper-models'&&v.target==='/models'));
+    assert.equal(app.environment.EBOOK_DIR,'/books');
+  }
+});
+
 test('setup preserves literal credentials, persists hardware choice, and rejects invalid modes without changes',async t=>{
   if(process.platform==='win32'&&!existsSync(bash)){t.skip('Git Bash is not installed.');return;}
   const folder=await mkdtemp(path.join(tmpdir(),'margin-setup-test-'));

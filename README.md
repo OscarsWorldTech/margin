@@ -1,5 +1,8 @@
 # Margin
 
+**Ebook folders:** pair an ordinary EPUB with an Audiobookshelf recording and
+align it inside Margin, without Storyteller. See [folder setup and alignment](docs/EBOOKS.md).
+
 **Storyteller read-along import:** source builds with this feature can use the
 original book text and timestamps from an aligned EPUB, alongside existing audio
 captions and notes. See [importing a Storyteller readaloud](docs/STORYTELLER.md) for

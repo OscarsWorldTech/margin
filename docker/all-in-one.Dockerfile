@@ -14,6 +14,8 @@ COPY --from=build /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 COPY --from=build /build/dist ./dist
 COPY server ./server
+COPY --from=build /build/node_modules/@zip.js/zip.js ./node_modules/@zip.js/zip.js
+COPY --from=build /build/node_modules/@xmldom/xmldom ./node_modules/@xmldom/xmldom
 COPY package.json LICENSE ./
 COPY public/demo.json public/demo.wav ./public/
 COPY docker/all-in-one.mjs docker/all-in-one-health.mjs ./docker/

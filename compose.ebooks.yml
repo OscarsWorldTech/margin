@@ -1,0 +1,13 @@
+# Optional overlay: combine with your EXISTING Margin Compose file.
+# docker compose -f compose.yml -f compose.ebooks.yml up -d
+services:
+  margin:
+    environment:
+      EBOOK_DIR: /books
+    volumes:
+      - type: bind
+        source: ${EBOOK_DIRECTORY:?Set EBOOK_DIRECTORY to the existing host EPUB folder}
+        target: /books
+        read_only: true
+        bind:
+          create_host_path: false

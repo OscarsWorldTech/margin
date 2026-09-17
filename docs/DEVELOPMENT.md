@@ -1,6 +1,6 @@
 # Development
 
-Use Node.js **24 or newer** and npm. Install FFmpeg for transcription and integration checks. The server uses Node's built-in SQLite with no runtime npm dependencies; the frontend uses React, Vite and Base UI components.
+Use Node.js **24 or newer** and npm. Install FFmpeg for transcription and integration checks. The server uses Node's built-in SQLite and pinned ZIP/XML parsers for optional ebook alignment; the frontend uses React, Vite and Base UI components.
 
 ```sh
 npm ci

@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certi
 WORKDIR /app
 COPY --from=build /build/dist ./dist
 COPY server ./server
+COPY --from=build /build/node_modules/@zip.js/zip.js ./node_modules/@zip.js/zip.js
+COPY --from=build /build/node_modules/@xmldom/xmldom ./node_modules/@xmldom/xmldom
 COPY package.json LICENSE ./
 COPY public/demo.json public/demo.wav ./public/
 RUN mkdir -p /data/cache && chown -R node:node /data /app
