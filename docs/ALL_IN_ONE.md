@@ -2,13 +2,13 @@
 
 These images contain Margin, FFmpeg and Whisper. Audiobookshelf remains a separate server. Run **one Margin container** and publish port **8787**. Whisper listens on loopback inside that container.
 
-The first all-in-one images use the **preview** channel, including development improvements beyond v0.1.5. Preview tags may move when another tested preview is published; use an image digest to pin an exact build. The existing `:v0.1.5` image is app-only. Future versioned releases use `:vX.Y.Z-aio-cpu`, `:vX.Y.Z-aio-vulkan`, and `:vX.Y.Z-aio-cuda`.
+Version **v0.1.6** includes versioned all-in-one images. Use `:v0.1.6-aio-cpu`, `:v0.1.6-aio-vulkan`, or `:v0.1.6-aio-cuda`. The plain `:v0.1.6` tag is app-only. Older preview tags are separate and do not automatically follow versioned releases.
 
 | Host | Image | Requirements |
 | --- | --- | --- |
-| Linux amd64 or arm64 | `ghcr.io/oscarsworldtech/margin:preview-aio-cpu` | No GPU required |
-| Intel / experimental AMD, Linux amd64 | `ghcr.io/oscarsworldtech/margin:preview-aio-vulkan` | Host driver, `/dev/dri`, render-group permission |
-| NVIDIA, Linux amd64 | `ghcr.io/oscarsworldtech/margin:preview-aio-cuda` | Compatible driver and NVIDIA Container Toolkit |
+| Linux amd64 or arm64 | `ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu` | No GPU required |
+| Intel / experimental AMD, Linux amd64 | `ghcr.io/oscarsworldtech/margin:v0.1.6-aio-vulkan` | Host driver, `/dev/dri`, render-group permission |
+| NVIDIA, Linux amd64 | `ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cuda` | Compatible driver and NVIDIA Container Toolkit |
 
 CPU images receive real inference, container recreation and shutdown checks on both architectures. GPU images receive build/library checks; inference needs validation on the target host. See [hardware prerequisites](HARDWARE.md).
 
@@ -30,11 +30,11 @@ For NVIDIA, use the CUDA image and add:
 
 Substitute the appropriate render node or NVIDIA device on multi-GPU hosts. Drivers and passthrough must already work inside the Docker host or VM. The image cannot install the host GPU driver.
 
-Before network access, configure [HTTPS and proxy trust](HTTPS.md). Older published images do not enforce the new defaults; only images explicitly containing the hardening patch do.
+Before network access, configure [HTTPS and proxy trust](HTTPS.md). Version 0.1.6 enforces these defaults; read the migration guide before upgrading older installations.
 
 ## Install with Compose
 
-The repository and future installation bundles include three complete, single-container configurations: `compose.aio.cpu.yml`, `compose.aio.intel.yml` (also usable for experimental AMD Vulkan), and `compose.aio.nvidia.yml`.
+The repository and v0.1.6 installation bundle include three complete, single-container configurations: `compose.aio.cpu.yml`, `compose.aio.intel.yml` (also usable for experimental AMD Vulkan), and `compose.aio.nvidia.yml`.
 
 Create a `.env` alongside the chosen file:
 
@@ -46,7 +46,7 @@ BIND_ADDRESS=127.0.0.1
 TRUSTED_PROXIES=YOUR_EXACT_PROXY_PEER_IP
 COOKIE_SECURE=true
 ALLOW_INSECURE_HTTP=false
-MARGIN_AIO_VERSION=preview
+MARGIN_AIO_VERSION=v0.1.6
 WHISPER_MODEL=small.en
 WHISPER_LANGUAGE=en
 # Intel/AMD: add RENDER_GID with the numeric result of stat -c '%g' /dev/dri/renderD128
@@ -105,8 +105,8 @@ The Dockerfile reuses a published worker image to avoid compiling Whisper again.
 
 ```sh
 docker build -f docker/all-in-one.Dockerfile -t margin-aio:local .
-# For Intel/AMD add: --build-arg WORKER_IMAGE=ghcr.io/oscarsworldtech/margin-whisper:v0.1.5-vulkan
-# For NVIDIA add: --build-arg WORKER_IMAGE=ghcr.io/oscarsworldtech/margin-whisper:v0.1.5-cuda
+# For Intel/AMD add: --build-arg WORKER_IMAGE=ghcr.io/oscarsworldtech/margin-whisper:v0.1.6-vulkan
+# For NVIDIA add: --build-arg WORKER_IMAGE=ghcr.io/oscarsworldtech/margin-whisper:v0.1.6-cuda
 ```
 
 You may also supply a locally built worker image. See [development](DEVELOPMENT.md) for tests and release workflows.

@@ -1,6 +1,6 @@
 services:
   margin:
-    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}:${MARGIN_VERSION:-v0.1.5}
+    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}:${MARGIN_VERSION:-v0.1.6}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:8787:8787"
     environment:
@@ -25,7 +25,7 @@ services:
       timeout: 5s
       retries: 3
   whisper:
-    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}-whisper:${MARGIN_VERSION:-v0.1.5}-cuda
+    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}-whisper:${MARGIN_VERSION:-v0.1.6}-cuda
     # Native NVIDIA Linux x86_64 is the initial target; Jetson is not covered.
     platform: linux/amd64
     deploy:

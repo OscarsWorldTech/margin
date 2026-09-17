@@ -1,5 +1,22 @@
 # Upgrading Margin
 
+## Upgrade to v0.1.6
+
+This release adds built-in EPUB alignment, Storyteller import and HTTPS/password
+hardening. Configure [HTTPS and a unique password](HTTPS.md) before restarting.
+Back up your data and preserve your existing Compose files, project name and volumes.
+
+- All-in-one: set `MARGIN_AIO_VERSION=v0.1.6` in `.env` (or change a hard-coded
+  image to `v0.1.6-aio-cpu`, `v0.1.6-aio-vulkan` or `v0.1.6-aio-cuda`, matching
+  your current backend). Keep using your existing all-in-one Compose filename.
+- Separate containers: set `MARGIN_VERSION=v0.1.6` in `.env`.
+- Pull and recreate the services with your usual Compose command. If you use
+  `compose.ebooks.yml`, retain both `-f` arguments for pull and up.
+- Verify v0.1.6 in the app header. Existing notes/captions remain available; resume
+  paused jobs if needed. Follow [ebook folder setup](EBOOKS.md) to enable pairing.
+
+## General upgrade procedure
+
 When upgrading to an image containing the security-hardening changes, first follow
 [the HTTPS/password migration guide](HTTPS.md). Existing network HTTP installations
 will receive 426 until configured for HTTPS or explicitly allowed private HTTP.

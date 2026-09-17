@@ -1,9 +1,8 @@
 # Ebook folder and built-in alignment
 
 Margin can pair a normal EPUB with an Audiobookshelf recording and produce
-read-along passages without Storyteller. This is available in source builds
-containing the ebook-alignment feature. It is **not available in older published
-images** until a new image is published. An aligned Storyteller EPUB remains
+read-along passages without Storyteller. This is included in **v0.1.6 and newer**
+images. Upgrade older installations before following this guide. An aligned Storyteller EPUB remains
 another option; see [Storyteller import](STORYTELLER.md).
 
 ## Connect an ebook folder

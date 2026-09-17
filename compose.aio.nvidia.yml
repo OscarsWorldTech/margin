@@ -1,6 +1,6 @@
 services:
   margin:
-    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}:${MARGIN_AIO_VERSION:-preview}-aio-cuda
+    image: ${MARGIN_IMAGE_BASE:-ghcr.io/oscarsworldtech/margin}:${MARGIN_AIO_VERSION:-v0.1.6}-aio-cuda
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:8787:8787"
     environment:

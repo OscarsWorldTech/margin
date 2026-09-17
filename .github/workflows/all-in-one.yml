@@ -10,7 +10,7 @@ on:
         default: preview
       worker_version:
         type: string
-        default: v0.1.5
+        default: v0.1.6
 concurrency:
   group: all-in-one-${{ inputs.tag_prefix }}-${{ inputs.publish }}
   cancel-in-progress: false

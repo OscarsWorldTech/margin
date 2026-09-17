@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const {version:releaseVersion}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
 const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'sh';
 
 test('each hardware configuration is complete and keeps storage and credentials consistent',t=>{
@@ -50,7 +51,7 @@ test('each hardware configuration is complete and keeps storage and credentials 
     const {services}=JSON.parse(result.stdout);
     assert.deepEqual(Object.keys(services),['margin']);
     const app=services.margin;
-    assert.ok(app.image.endsWith(`:preview-aio-${backend}`));
+    assert.ok(app.image.endsWith(`:v${releaseVersion}-aio-${backend}`));
     assert.deepEqual(app.volumes.map(v=>[v.source,v.target]),[['margin-data','/data'],['whisper-models','/models']]);
     assert.equal(app.ports.length,1);assert.equal(app.ports[0].target,8787);
     assert.equal(app.environment.WHISPER_URL,undefined,'the built-in worker address is managed by the image');

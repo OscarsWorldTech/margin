@@ -1,4 +1,4 @@
-ARG WORKER_IMAGE=ghcr.io/oscarsworldtech/margin-whisper:v0.1.5-cpu
+ARG WORKER_IMAGE=ghcr.io/oscarsworldtech/margin-whisper:v0.1.6-cpu
 FROM node:24-bookworm-slim AS build
 WORKDIR /build
 COPY package.json package-lock.json ./

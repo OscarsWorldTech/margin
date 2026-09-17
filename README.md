@@ -1,20 +1,15 @@
 # Margin
 
-**Ebook folders:** pair an ordinary EPUB with an Audiobookshelf recording and
-align it inside Margin, without Storyteller. See [folder setup and alignment](docs/EBOOKS.md).
+Listen to your Audiobookshelf library, follow the book text or generated captions, and save highlights and notes linked to the audio. Margin runs on your own Docker host, with optional Intel, NVIDIA or CPU transcription.
 
-**Storyteller read-along import:** source builds with this feature can use the
-original book text and timestamps from an aligned EPUB, alongside existing audio
-captions and notes. See [importing a Storyteller readaloud](docs/STORYTELLER.md) for
-setup, recording checks, and current limitations.
-
-Listen to your Audiobookshelf library with captions, highlight a sentence, and save a note linked to that moment in the audio. Margin runs on your own Docker host and generates captions locally with whisper.cpp.
+**New in v0.1.6:** pair an ordinary EPUB from a mounted folder, align it inside Margin, and review the results before reading along. Storyteller is optional: you can also import an already aligned Storyteller EPUB.
 
 ![Margin reader with sample captions and a saved note](docs/screenshots/reader.png)
 
 *Actual app in sample mode, using a public-domain speech excerpt and prepared captions.*
 
 - Read along with the active sentence, search passages, and jump to chapters.
+- Pair EPUBs from your ebook folder, or import aligned Storyteller EPUBs.
 - Save sentence highlights and notes; export them as Markdown or JSON.
 - Keep listening while browsing your library, and fine-tune playback speed.
 - Resume your listening position between Margin and Audiobookshelf.
@@ -24,7 +19,7 @@ Margin is an early, single-user application. Everyone using its password shares 
 
 ## Network security
 
-For network access, configure HTTPS using [the HTTPS guide](docs/HTTPS.md). Development builds containing the security-hardening patch reject network HTTP unless explicitly acknowledged, and require a unique password of at least 16 characters. Older published images still need HTTPS even though they do not enforce it. See [hardening status](docs/SECURITY_HARDENING.md) for release availability.
+For network access, configure HTTPS using [the HTTPS guide](docs/HTTPS.md). Version 0.1.6 rejects network HTTP unless explicitly acknowledged, and requires a unique password of at least 16 characters. Existing installations should read the migration guide before updating. See [hardening status](docs/SECURITY_HARDENING.md) for implemented protections and remaining work.
 
 ## Before you install
 
@@ -41,13 +36,13 @@ You do not need a GPU on the device running your browser. A GPU in the Docker ho
 
 The all-in-one image includes Margin and its transcription worker in **one container**. No source download or local build is required. Audiobookshelf still runs separately.
 
-These are **preview images** containing the latest development changes. The existing `v0.1.5` tag is app-only. Pick the image for your Docker host:
+Pick the **versioned all-in-one image** for your Docker host. The plain `v0.1.6` tag is app-only; use an `-aio-` tag for the complete single-container installation:
 
 | Hardware | Pull command |
 | --- | --- |
-| CPU (amd64 / arm64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cpu` |
-| Intel / experimental AMD (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-vulkan` |
-| NVIDIA (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cuda` |
+| CPU (amd64 / arm64) | `docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu` |
+| Intel / experimental AMD (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-vulkan` |
+| NVIDIA (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cuda` |
 
 For a first CPU installation, configure your HTTPS proxy and its exact `TRUSTED_PROXIES` address using the guide above, then:
 
@@ -69,13 +64,13 @@ For a first CPU installation, configure your HTTPS proxy and its exact `TRUSTED_
 3. Pull and start the image:
 
    ```sh
-   docker pull ghcr.io/oscarsworldtech/margin:preview-aio-cpu
+   docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu
    docker run -d --name margin --restart unless-stopped \
      --env-file margin.env \
      -p 127.0.0.1:8787:8787 \
      -v margin-data:/data \
      -v whisper-models:/models \
-     ghcr.io/oscarsworldtech/margin:preview-aio-cpu
+     ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu
    ```
 
 4. Follow `docker logs -f margin` until the first model download and Whisper startup finish. Open **your configured HTTPS address**, sign in with your Margin password, open a book, and choose **Generate captions**.
@@ -88,7 +83,7 @@ Intel and NVIDIA need additional GPU options. The [all-in-one guide](docs/ALL_IN
 
 ### 1. Download Margin
 
-Download **margin-v0.1.5-install.zip** from the [v0.1.5 release](https://github.com/OscarsWorldTech/margin/releases/tag/v0.1.5). Extract it on your Docker host and open a terminal in the extracted `margin` folder. Keep the complete folder together, including `.env.example`.
+Download **margin-v0.1.6-install.zip** from the [v0.1.6 release](https://github.com/OscarsWorldTech/margin/releases/tag/v0.1.6). Extract it on your Docker host and open a terminal in the extracted `margin` folder. Keep the complete folder together, including `.env.example`.
 
 
 ### 2. Choose your hardware
@@ -125,7 +120,7 @@ BIND_ADDRESS=127.0.0.1
 - `MARGIN_PASSWORD` is the password for opening Margin, not your Audiobookshelf password. Single quotes preserve literal characters such as `$` and `#`; avoid a literal single quote in this value.
 - Keep `BIND_ADDRESS=127.0.0.1` for a same-host proxy. Configure `TRUSTED_PROXIES`, `COOKIE_SECURE=true`, and your external `ALLOWED_ORIGINS` as described in the HTTPS guide. A different-host proxy needs a restricted bind address/firewall.
 
-Keep the hardware selection written by setup.sh and `MARGIN_VERSION=v0.1.5`. For non-English audio, choose a multilingual model such as `small` and set `WHISPER_LANGUAGE=auto` or a language code. Sentence splitting currently follows English punctuation conventions.
+Keep the hardware selection written by setup.sh and `MARGIN_VERSION=v0.1.6`. For non-English audio, choose a multilingual model such as `small` and set `WHISPER_LANGUAGE=auto` or a language code. Sentence splitting currently follows English punctuation conventions.
 
 ### 5. Start the services
 
@@ -152,6 +147,30 @@ Press Play to read along. Click a passage timestamp to replay it, select a sente
 ![Playback speed presets and fine adjustment](docs/screenshots/playback-speed.png)
 
 See [listening, notes, sync and limitations](docs/USAGE.md) for keyboard shortcuts, exports, and using another Audiobookshelf client.
+
+## Read along with an ebook
+
+You need a DRM-free EPUB of the **same edition** as the recording in Audiobookshelf.
+Mount its folder read-only using the supplied `compose.ebooks.yml` overlay, then:
+
+1. Open the audiobook and choose **Pair ebook from folder**.
+2. Scan, select the EPUB, and check its metadata and sample wording.
+3. Choose **Align this ebook**. Margin reuses captions or generates them locally.
+4. Review coverage and listen to sample passages before choosing **Use aligned book text**.
+
+See [complete folder setup](docs/EBOOKS.md) for the mount and update commands.
+Timings are approximate: this matches ebook text to caption segments, and omits
+unmatched passages. Your original captions and saved notes are preserved.
+Already have an aligned EPUB? Use [Import Storyteller EPUB](docs/STORYTELLER.md).
+
+<p>
+  <img src="docs/screenshots/ebook-pairing.png" alt="Choose and preview an EPUB from a mounted folder" width="300">
+  <img src="docs/screenshots/ebook-review.png" alt="Review matched passages and listen to samples before activation" width="300">
+  <img src="docs/screenshots/ebook-reader.png" alt="Read original ebook text with persistent playback controls" width="300">
+</p>
+
+*Fresh v0.1.6 app screenshots in a narrow browser layout, using synthetic test
+text. The sample demonstrates the workflow, not real-book alignment accuracy.*
 
 ## Already installed?
 

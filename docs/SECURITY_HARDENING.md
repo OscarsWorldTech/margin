@@ -1,7 +1,7 @@
 # Security hardening status
 
-Based on the audit of `8695777` dated 2026-09-14. This is development status, not a
-release announcement or evidence of compromise. No v0.1.6 release has been created.
+Based on the audit of `8695777` dated 2026-09-14. The implemented changes below are
+included in v0.1.6. Pending items remain open; this is not evidence of compromise.
 
 | Audit finding | This patch |
 | --- | --- |

@@ -2,8 +2,7 @@
 
 Margin can import timed passages from an **aligned readaloud EPUB** exported by
 [Storyteller](https://storyteller-platform.dev/docs/managing/aligning/). This feature
-is available in source builds containing the Storyteller import change; older
-published images do not gain it until a new image is published.
+is included in v0.1.6 and newer images. Upgrade older installations first.
 
 You need the aligned EPUB and the **same audiobook edition** in Audiobookshelf.
 A normal EPUB has no audio timings and cannot be imported this way. For a normal EPUB, use [built-in ebook alignment](EBOOKS.md) instead.
