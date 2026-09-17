@@ -1,10 +1,25 @@
 import {openAsBlob} from 'node:fs';
 import {BlobReader,ZipReader} from '@zip.js/zip.js';
 import {DOMParser} from '@xmldom/xmldom';
+// Use the entity table bundled with our pinned parser, never an external DTD.
+import {HTML_ENTITIES} from '@xmldom/xmldom/lib/entities.js';
 
 const nodes=(node,name)=>Array.from(node.getElementsByTagNameNS('*',name));
 const attribute=(node,key)=>node?.getAttribute(key)||'';
 const fail=message=>{throw Error(message);};
+const quotedIdentifier=String.raw`(?:"[^"\[\]<>]*"|'[^'\[\]<>]*')`;
+const externalDoctype=new RegExp(String.raw`<!DOCTYPE\s+html(?:\s+(?:PUBLIC\s+${quotedIdentifier}\s+${quotedIdentifier}|SYSTEM\s+${quotedIdentifier}))?\s*>`,'i');
+function prepareXml(source){
+  // Strip external declarations without fetching them; internal subsets stay rejected.
+  const text=source.replace(externalDoctype,'');
+  if(/<!DOCTYPE|<!ENTITY/i.test(text))fail('EPUB custom DTDs and entities are not supported.');
+  // Numeric references preserve XML parsing rules, including escaped markup. Leave
+  // literal CDATA, comments and processing instructions untouched.
+  return text.replace(/<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|&([A-Za-z][A-Za-z0-9]*);/g,(match,name)=>{
+    if(!name||!Object.hasOwn(HTML_ENTITIES,name))return match;
+    return Array.from(HTML_ENTITIES[name],char=>'&#'+char.codePointAt(0)+';').join('');
+  });
+}
 function relativeFile(base,href){
   if(!href||/^[a-z][a-z\d+.-]*:|^\/|\\/i.test(href))fail('EPUB contains an external or unsupported document reference.');
   const url=new URL(href,'https://epub.invalid/'+base);
@@ -34,8 +49,7 @@ export async function readEpubText(file){
         if(size>4*1024*1024||total>32*1024*1024)fail('EPUB expanded text exceeds the import limits.');
         chunks.push(chunk);
       }}),{checkSignature:true});
-      const text=(await new Blob(chunks).text()).replace(/<!DOCTYPE\s+html\s*>/i,'');
-      if(/<!DOCTYPE|<!ENTITY/i.test(text))fail('EPUB custom DTDs and entities are not supported.');
+      const text=prepareXml(await new Blob(chunks).text());
       let doc;
       try{doc=new DOMParser({onError:()=>{throw Error('Invalid XML');}}).parseFromString(text,'application/xml');}catch{fail('EPUB contains invalid XML.');}
       if(nodes(doc,'*').some(node=>node.hasAttribute('xml:base')))fail('EPUB xml:base references are unsupported.');

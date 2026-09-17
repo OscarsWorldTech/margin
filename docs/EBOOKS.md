@@ -27,8 +27,9 @@ In the directory holding your existing Margin Compose configuration:
    docker compose -f compose.yml -f compose.ebooks.yml up -d
    ```
 
-   Replace `compose.yml` with the filename you already use, such as
-   `compose.aio.yml`. Retain any existing `-p PROJECT` option. Do not switch to a
+   Replace `compose.yml` with the filename you already use. The supplied all-in-one
+   files are `compose.aio.cpu.yml`, `compose.aio.intel.yml` and
+   `compose.aio.nvidia.yml`. Retain any existing `-p PROJECT` option. Do not switch to a
    different hardware profile or create a new project/volume as part of this step.
    Use both `-f` arguments for subsequent updates as well. This file is an optional
    overlay; the ordinary hardware profiles are still complete alternatives.
@@ -99,7 +100,9 @@ dependency; GPU support comes from Margin's existing Whisper configuration.
   up to 400,000 caption words and 120 words per matched sentence. At most 20 books
   can await alignment, with text jobs processed one at a time.
 - Use unencrypted EPUBs. Standard IDPF font obfuscation is allowed because fonts
-  are ignored. DRM, custom DTDs/entities, xml:base and external document references
+  are ignored. Standard XHTML external doctypes are stripped without fetching a
+  DTD; named characters such as `&nbsp;` use the parser's built-in character table.
+  DRM, internal DTD subsets/custom entities, xml:base and external document references
   are unsupported. Text parsing happens in a memory-limited worker with a timeout;
   archive contents are never extracted onto the server filesystem or rendered as HTML.
 - If matching fails, confirm the edition and language, check caption quality, and

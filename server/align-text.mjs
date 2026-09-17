@@ -55,7 +55,7 @@ export function alignText(ebook,captions,duration,progress=()=>{}){
         if(right<=left)continue;
         const match=windowMatch(query,transcript,left,right);
         const threshold=query.length<6?1:.85;
-        if(match&&match.score>=threshold&&match.end>match.start&&(!best||match.start<best.start||match.start===best.start&&match.score>best.score))best=match;
+        if(match&&match.score>=threshold&&match.end>match.start&&(!best||match.score>best.score||match.score===best.score&&match.start<best.start))best=match;
       }
     }
     if(best){

@@ -40,6 +40,23 @@ test('symlink files and directories are excluded, including a replacement after 
   await assert.rejects(()=>lib.resolve(selected.id),/Linked/);
 });
 
+test('EPUB 2 external doctypes and named characters work without enabling custom entities',async t=>{
+  const dir=await folder(t),file=path.join(dir,'book.epub');
+  const body='<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Caf&eacute;&nbsp;&mdash; &ldquo;Hello&rdquo; &amp; goodbye.</p><p><![CDATA[Literal &nbsp; stays.]]></p></body></html>';
+  for(const doctype of ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">',"<!DOCTYPE html SYSTEM 'https://example.invalid/never-fetch.dtd'>"]){
+    await fixture(file,{'EPUB/text/ch1.xhtml':doctype+body});
+    const ebook=await readEpubText(file);
+    assert.equal(ebook.sentences[0].text,'Café — “Hello” & goodbye.');
+    assert.equal(ebook.sentences[1].text,'Literal &nbsp; stays.');
+  }
+  for(const declaration of ['<!DOCTYPE html SYSTEM "https://example.invalid/never-fetch.dtd" [<!ENTITY x "unsafe">]>','<!DOCTYPE html [<!ENTITY x SYSTEM "file:///etc/passwd">]>','<!ENTITY x SYSTEM "https://example.invalid/secret">']){
+    await fixture(file,{'EPUB/text/ch1.xhtml':declaration+body});
+    await assert.rejects(()=>readEpubText(file),/DTDs/);
+  }
+  await fixture(file,{'EPUB/text/ch1.xhtml':'<html><body><p>&unknownMarginEntity;</p></body></html>'});
+  await assert.rejects(()=>readEpubText(file),/invalid XML/);
+});
+
 test('EPUB permits ignored obfuscated fonts but rejects encrypted text and unsafe documents',async t=>{
   const dir=await folder(t),file=path.join(dir,'book.epub');
   const packageXml='<package><manifest><item id="chapter" href="text/ch1.xhtml" media-type="application/xhtml+xml"/><item id="font" href="fonts/book.ttf" media-type="font/ttf"/></manifest><spine><itemref idref="chapter"/></spine></package>';
@@ -78,6 +95,18 @@ test('repeated sentences retain occurrence order and multi-track global timing g
   const text='We will meet beneath the old oak tree.';
   const result=alignText({title:'Book',sentences:[{text,anchor:'a'},{text,anchor:'b'}]},[{start:2,end:8,text},{start:100,end:110,text}],120);
   assert.deepEqual(result.cues.map(c=>[c.start,c.end]),[[2,8],[100,110]]);
+});
+
+test('alignment chooses a stronger match over an earlier similar passage',()=>{
+  const text='The quiet river flows beneath the ancient stone bridge while distant birds sing softly beside the green meadow every morning.';
+  const similar=text.replace('quiet','wide').replace('ancient','narrow').replace('distant','happy');
+  const result=alignText({title:'Book',sentences:[{text,anchor:'a'}]},[
+    {start:0,end:20,text:similar},
+    {start:20,end:60,text:'unrelated '.repeat(40)},
+    {start:100,end:120,text},
+  ],130);
+  assert.equal(result.cues[0].start,100);
+  assert.equal(result.cues[0].end,120);
 });
 
 test('alignment jobs start/resume transcription, survive restart and require activation',async t=>{

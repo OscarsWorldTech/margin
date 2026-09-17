@@ -64,7 +64,7 @@ test('each hardware configuration is complete and keeps storage and credentials 
 test('ebook overlay preserves existing volumes and mounts the library read-only',t=>{
   const dockerArgs=process.env.DOCKER_CONFIG?['--config',process.env.DOCKER_CONFIG]:[];
   if(spawnSync('docker',[...dockerArgs,'compose','version'],{windowsHide:true}).status!==0){t.skip('Docker Compose CLI is not installed.');return;}
-  for(const file of ['compose.cpu.yml','compose.aio.intel.yml']){
+  for(const file of ['compose.cpu.yml','compose.aio.intel.yml','compose.prebuilt.yml','compose.prebuilt.cpu.yml','compose.prebuilt.nvidia.yml']){
     const result=spawnSync('docker',[...dockerArgs,'compose','--env-file','.env.example','-f',file,'-f','compose.ebooks.yml','config','--format','json'],{cwd:root,env:{...process.env,EBOOK_DIRECTORY:root},encoding:'utf8',windowsHide:true});
     assert.equal(result.status,0,result.stderr);
     const app=JSON.parse(result.stdout).services.margin;
