@@ -36,13 +36,22 @@ You do not need a GPU on the device running your browser. A GPU in the Docker ho
 
 The all-in-one image includes Margin and its transcription worker in **one container**. No source download or local build is required. Audiobookshelf still runs separately.
 
-Pick the **versioned all-in-one image** for your Docker host. The plain `v0.1.6` tag is app-only; use an `-aio-` tag for the complete single-container installation:
+Pick the all-in-one image for your Docker host. The `latest-aio-*` tags follow
+the newest published version after all release checks pass, including early
+releases marked as prereleases on GitHub. Preview builds do not update them.
+The plain `v0.1.6` tag is app-only; use an `-aio-` tag for the complete container:
 
 | Hardware | Pull command |
 | --- | --- |
-| CPU (amd64 / arm64) | `docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu` |
-| Intel / experimental AMD (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-vulkan` |
-| NVIDIA (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cuda` |
+| CPU (amd64 / arm64) | `docker pull ghcr.io/oscarsworldtech/margin:latest-aio-cpu` |
+| Intel / experimental AMD (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:latest-aio-vulkan` |
+| NVIDIA (amd64) | `docker pull ghcr.io/oscarsworldtech/margin:latest-aio-cuda` |
+
+For Compose, set `MARGIN_AIO_VERSION=latest` in `.env`. To pin a release or roll
+back to a compatible version, use an explicit tag such as `MARGIN_AIO_VERSION=v0.1.6`
+instead. Versioned tags remain available. A moving tag does not update a running
+container automatically: run `docker compose pull` and `docker compose up -d`
+with your existing file/project options, retaining all mounts and volumes.
 
 For a first CPU installation, configure your HTTPS proxy and its exact `TRUSTED_PROXIES` address using the guide above, then:
 
@@ -64,13 +73,13 @@ For a first CPU installation, configure your HTTPS proxy and its exact `TRUSTED_
 3. Pull and start the image:
 
    ```sh
-   docker pull ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu
+   docker pull ghcr.io/oscarsworldtech/margin:latest-aio-cpu
    docker run -d --name margin --restart unless-stopped \
      --env-file margin.env \
      -p 127.0.0.1:8787:8787 \
      -v margin-data:/data \
      -v whisper-models:/models \
-     ghcr.io/oscarsworldtech/margin:v0.1.6-aio-cpu
+     ghcr.io/oscarsworldtech/margin:latest-aio-cpu
    ```
 
 4. Follow `docker logs -f margin` until the first model download and Whisper startup finish. Open **your configured HTTPS address**, sign in with your Margin password, open a book, and choose **Generate captions**.

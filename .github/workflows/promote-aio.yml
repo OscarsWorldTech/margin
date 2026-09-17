@@ -1,0 +1,72 @@
+name: Update latest all-in-one tags
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version to promote (for example v0.1.6)
+        type: string
+        required: true
+concurrency:
+  group: publish-aio-latest
+  cancel-in-progress: false
+permissions:
+  contents: read
+  packages: write
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate the release and resolve every source before changing aliases
+        id: source
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          # A published release is created only after all image checks pass.
+          gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' | grep -qx false
+          # Do not let an older release finishing later move latest backwards.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[] | select(.draft == false) | .tag_name' > "$RUNNER_TEMP/release-tags"
+          node - "$RUNNER_TEMP/release-tags" <<'NODE'
+          const fs = require('node:fs');
+          const versions = fs.readFileSync(process.argv[2], 'utf8').trim().split(/\s+/).filter(v => /^v\d+\.\d+\.\d+$/.test(v));
+          versions.sort((a,b) => { const x=a.slice(1).split('.').map(BigInt), y=b.slice(1).split('.').map(BigInt); for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]>y[i]?-1:1; return 0; });
+          if (versions[0] !== process.env.VERSION) throw Error('Only the newest published version may update latest: '+versions[0]);
+          NODE
+          base="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for backend in cpu vulkan cuda; do
+            digest=$(docker buildx imagetools inspect "$base:$VERSION-aio-$backend" --format '{{.Manifest.Digest}}')
+            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+            echo "$backend=$digest" >> "$GITHUB_OUTPUT"
+          done
+      - name: Publish and verify aliases without rebuilding versioned images
+        env:
+          CPU: ${{ steps.source.outputs.cpu }}
+          VULKAN: ${{ steps.source.outputs.vulkan }}
+          CUDA: ${{ steps.source.outputs.cuda }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for backend in cpu vulkan cuda; do
+            key=${backend^^}
+            digest=${!key}
+            docker buildx imagetools create -t "$base:latest-aio-$backend" "$base@$digest"
+            actual=$(docker buildx imagetools inspect "$base:latest-aio-$backend" --format '{{.Manifest.Digest}}')
+            test "$actual" = "$digest"
+            echo "$base:latest-aio-$backend → $digest" >> "$GITHUB_STEP_SUMMARY"
+          done

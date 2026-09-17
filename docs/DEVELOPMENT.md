@@ -54,3 +54,12 @@ README screenshots are actual demo-mode captures with synthetic annotations. Kee
 The manual Validate Margin workflow's `publish_all_in_one` option builds native CPU amd64/arm64 and GPU amd64 variants. CPU smoke checks perform real sample inference, save a note, recreate the container with the same volumes, verify loopback-only worker access, check clean shutdown, and kill the worker to verify failure propagation. Linux tests also check forced termination of an uncooperative child. GPU jobs check native libraries only.
 
 Only after all four image checks pass are `preview-aio-*` tags published, along with exact `sha-COMMIT-aio-*` tags. Tagged releases publish versioned all-in-one images using their matching worker version before creating release downloads. Preview publishing does not merge a branch or create a Git release.
+
+After release downloads are published, `publish.yml` calls `promote-aio.yml` to
+point `latest-aio-cpu`, `latest-aio-vulkan` and `latest-aio-cuda` at the exact
+versioned manifest digests. No rebuild is needed. Promotion is serialized and
+rejects anything except the highest published numeric version (including GitHub
+prereleases). The manual promotion workflow can retry a failed promotion by
+selecting its existing published version. It preflights all three source tags,
+then verifies each alias digest; registry writes are per tag, not atomic across
+hardware variants. Versioned tags and preview tags are never modified by promotion.

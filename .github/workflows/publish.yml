@@ -173,3 +173,11 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           gh release create "$VERSION" release/* --verify-tag --prerelease --title "Margin $VERSION" --notes-file docs/RELEASE.md
+  latest:
+    needs: [verify, release]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/promote-aio.yml
+    with:
+      version: ${{ needs.verify.outputs.version }}

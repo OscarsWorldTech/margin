@@ -51,7 +51,10 @@ test('each hardware configuration is complete and keeps storage and credentials 
     const {services}=JSON.parse(result.stdout);
     assert.deepEqual(Object.keys(services),['margin']);
     const app=services.margin;
-    assert.ok(app.image.endsWith(`:v${releaseVersion}-aio-${backend}`));
+    assert.ok(app.image.endsWith(`:latest-aio-${backend}`));
+    const pinned=spawnSync('docker',[...dockerArgs,'compose','--env-file','.env.example','-f',`compose.aio.${kind}.yml`,'config','--format','json'],{cwd:root,env:{...process.env,MARGIN_AIO_VERSION:'v'+releaseVersion},encoding:'utf8',windowsHide:true});
+    assert.equal(pinned.status,0,pinned.stderr);
+    assert.ok(JSON.parse(pinned.stdout).services.margin.image.endsWith(`:v${releaseVersion}-aio-${backend}`));
     assert.deepEqual(app.volumes.map(v=>[v.source,v.target]),[['margin-data','/data'],['whisper-models','/models']]);
     assert.equal(app.ports.length,1);assert.equal(app.ports[0].target,8787);
     assert.equal(app.environment.WHISPER_URL,undefined,'the built-in worker address is managed by the image');

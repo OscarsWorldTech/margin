@@ -1,5 +1,12 @@
 # Upgrading Margin
 
+To follow newly published all-in-one releases, set `MARGIN_AIO_VERSION=latest`
+in your existing `.env`, then pull and recreate with your usual Compose file and
+project options. This includes checked GitHub prereleases, but excludes preview
+builds. Updates are manual unless you separately configure an update service.
+Keep `MARGIN_AIO_VERSION=v0.1.6` (or another compatible version) when you want a
+fixed release. See [all-in-one updates](ALL_IN_ONE.md#persistent-data-and-updates).
+
 ## Upgrade to v0.1.6
 
 This release adds built-in EPUB alignment, Storyteller import and HTTPS/password
