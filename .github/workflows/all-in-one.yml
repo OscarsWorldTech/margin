@@ -93,6 +93,9 @@ jobs:
   publish:
     needs: build
     if: inputs.publish
+    concurrency:
+      group: publish-aio-${{ inputs.tag_prefix }}
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -112,7 +115,17 @@ jobs:
       - name: Publish all hardware tags only after every check passes
         env:
           PREFIX: ${{ inputs.tag_prefix }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          if [ "$PREFIX" = latest ]; then
+            test "$GITHUB_REF" = refs/heads/main
+            current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+            if [ "$current" != "$GITHUB_SHA" ]; then
+              echo 'A newer main commit exists; leaving latest tags unchanged.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
           base="ghcr.io/${GITHUB_REPOSITORY,,}"
           for backend in cpu vulkan cuda; do
             sources=("$(cat "aio-digests/$backend-amd64.txt")")

@@ -37,8 +37,9 @@ You do not need a GPU on the device running your browser. A GPU in the Docker ho
 The all-in-one image includes Margin and its transcription worker in **one container**. No source download or local build is required. Audiobookshelf still runs separately.
 
 Pick the all-in-one image for your Docker host. The `latest-aio-*` tags follow
-the newest published version after all release checks pass, including early
-releases marked as prereleases on GitHub. Preview builds do not update them.
+the latest code merged into `main`, published automatically after application
+and container checks pass. These builds can include changes before the next
+versioned release. Preview builds do not update them.
 The plain `v0.1.6` tag is app-only; use an `-aio-` tag for the complete container:
 
 | Hardware | Pull command |

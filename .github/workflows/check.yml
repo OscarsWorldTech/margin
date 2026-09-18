@@ -5,9 +5,14 @@ on:
   workflow_dispatch:
     inputs:
       publish_all_in_one:
-        description: Build and publish preview all-in-one images
+        description: Build and publish all-in-one images
         type: boolean
         default: false
+      image_channel:
+        description: Image channel (latest is allowed only from main)
+        type: choice
+        options: [preview, latest]
+        default: preview
 permissions:
   contents: read
 jobs:
@@ -60,10 +65,11 @@ jobs:
           node --input-type=module -e "import fs from 'node:fs';const r=JSON.parse(fs.readFileSync('/tmp/margin-inference.json'));if(!r.segments?.length&&!r.transcription?.length)throw Error('No caption segments returned');"
   all-in-one:
     needs: application
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_all_in_one
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_all_in_one)
     permissions:
       contents: read
       packages: write
     uses: ./.github/workflows/all-in-one.yml
     with:
       publish: true
+      tag_prefix: ${{ github.event_name == 'push' && 'latest' || inputs.image_channel }}

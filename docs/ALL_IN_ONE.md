@@ -3,8 +3,9 @@
 These images contain Margin, FFmpeg and Whisper. Audiobookshelf remains a separate server. Run **one Margin container** and publish port **8787**. Whisper listens on loopback inside that container.
 
 Use `:latest-aio-cpu`, `:latest-aio-vulkan`, or `:latest-aio-cuda` to follow the
-newest published version after all release checks pass. This includes early
-versions marked as GitHub prereleases. Preview builds remain separate. To pin a
+latest code merged into `main` after application and container checks pass.
+Images rebuild automatically after each merge, so they may include changes
+before the next versioned release. Preview builds remain separate. To pin a
 release, use `:v0.1.6-aio-cpu`, `:v0.1.6-aio-vulkan`, or `:v0.1.6-aio-cuda`.
 The plain `:v0.1.6` tag is app-only.
 
@@ -86,8 +87,8 @@ The app's Connections & timing dialog can also check the engine. Do not publish 
 
 ## Persistent data and updates
 
-Set `MARGIN_AIO_VERSION=latest` in your existing Compose `.env` to follow new
-releases. Older installation ZIPs may default to a fixed version; this explicit
+Set `MARGIN_AIO_VERSION=latest` in your existing Compose `.env` to follow tested
+main builds. Older installation ZIPs may default to a fixed version; this explicit
 setting overrides that default. If your Compose image contains a hard-coded tag,
 replace that tag with the appropriate `latest-aio-*` tag instead.
 Use `MARGIN_AIO_VERSION=v0.1.6` to stay pinned. `latest` alone does not upgrade a

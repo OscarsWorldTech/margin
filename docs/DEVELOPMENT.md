@@ -43,7 +43,7 @@ Source configurations are complete files, not overlays. Do not combine hardware 
 
 Pushes and PRs run `.github/workflows/check.yml`. Version tags matching package.json trigger publishing: app tests, native amd64/arm64 app and CPU builds with smoke tests, and amd64 CUDA/Vulkan linking checks. Release manifests and an installation ZIP follow only after all jobs pass. Hosted runners do not verify GPU inference.
 
-Development work should stay on branches for review. Do not push a version tag or run publishing just to test a change. Existing published image tags remain unchanged until an intentional release. `python scripts/release-bundle.py` creates a local installation archive, not a release.
+Development work should stay on branches for review. Do not push a version tag or run publishing just to test a change. Versioned image tags remain unchanged; moving all-in-one tags update after checked merges to main. `python scripts/release-bundle.py` creates a local installation archive, not a release.
 
 README screenshots are actual demo-mode captures with synthetic annotations. Keep tokens, private books and personal host addresses out of screenshots. The optional read-only WebMCP tool exposes the current demo/book context on compatible browsers; unsupported browsers ignore it.
 
@@ -51,15 +51,12 @@ README screenshots are actual demo-mode captures with synthetic annotations. Kee
 
 `docker/all-in-one.Dockerfile` adds the app to the selected published worker image. It includes a non-root process supervisor and tini, a combined readiness check, and persistent `/data` and `/models` directories. Local builds are described in [the all-in-one guide](ALL_IN_ONE.md#building-from-source).
 
-The manual Validate Margin workflow's `publish_all_in_one` option builds native CPU amd64/arm64 and GPU amd64 variants. CPU smoke checks perform real sample inference, save a note, recreate the container with the same volumes, verify loopback-only worker access, check clean shutdown, and kill the worker to verify failure propagation. Linux tests also check forced termination of an uncooperative child. GPU jobs check native libraries only.
+Every push to `main`, including a merged PR, runs the application checks and then builds native CPU amd64/arm64 and GPU amd64 all-in-one variants. Only after all four container checks pass does it publish `latest-aio-cpu`, `latest-aio-vulkan`, and `latest-aio-cuda`, alongside exact `sha-COMMIT-aio-*` tags. PR checks and pushes to other branches do not automatically publish images. Publication is serialized and checks the current main commit so an outdated build cannot move latest backwards. Tags are written individually, not atomically across hardware variants.
 
-Only after all four image checks pass are `preview-aio-*` tags published, along with exact `sha-COMMIT-aio-*` tags. Tagged releases publish versioned all-in-one images using their matching worker version before creating release downloads. Preview publishing does not merge a branch or create a Git release.
+CPU smoke checks perform real sample inference, save a note, recreate the container with the same volumes, verify loopback-only worker access, check clean shutdown, and kill the worker to verify failure propagation. Linux tests also check forced termination of an uncooperative child. GPU jobs check native libraries only.
 
-After release downloads are published, `publish.yml` calls `promote-aio.yml` to
-point `latest-aio-cpu`, `latest-aio-vulkan` and `latest-aio-cuda` at the exact
-versioned manifest digests. No rebuild is needed. Promotion is serialized and
-rejects anything except the highest published numeric version (including GitHub
-prereleases). The manual promotion workflow can retry a failed promotion by
-selecting its existing published version. It preflights all three source tags,
-then verifies each alias digest; registry writes are per tag, not atomic across
-hardware variants. Versioned tags and preview tags are never modified by promotion.
+These builds reuse the published worker version selected in `all-in-one.yml` (currently `v0.1.6`). Changes to the compiled Whisper worker require a versioned worker release and an update to that selection. Tagged releases build their matching workers and publish versioned all-in-one images before creating release downloads; they do not overwrite latest.
+
+For a manual build, run Validate Margin with `publish_all_in_one` enabled. The default `image_channel=preview` publishes `preview-aio-*` tags without changing latest. To retry latest publication, select the current `main` branch and `image_channel=latest`; other branches cannot publish latest. No Git release is created by these builds.
+
+The manual `promote-aio.yml` workflow remains available to deliberately reset latest to the newest published numeric release, including GitHub prereleases. It verifies the source digests and serializes alias updates with normal main publication. The next successful main build will move latest forward again. Versioned tags remain unchanged.
