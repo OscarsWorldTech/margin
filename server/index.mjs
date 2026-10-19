@@ -13,6 +13,7 @@ import {securityConfig,requestSecurity,validatePassword,browserPolicies,LoginLim
 import {validateReadalong} from './readalong.mjs';
 import {AlignmentJobs} from './alignment-jobs.mjs';
 import {processEbook} from './ebooks.mjs';
+import {initializeOutbox,queueNote,drainOutbox,openAICompatibleSummarizer} from './obsidian-sync.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {version}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -35,6 +36,32 @@ const whisperBase=(process.env.WHISPER_URL||'http://whisper:8080').replace(/\/$/
 const password=process.env.MARGIN_PASSWORD||'';
 if(!demo)validatePassword(password);
 const security=securityConfig(process.env);
+const obsidianEnabled=process.env.OBSIDIAN_SYNC_ENABLED==='true';
+const obsidianVault=process.env.OBSIDIAN_VAULT_DIR;
+const obsidianDryRun=process.env.OBSIDIAN_SYNC_DRY_RUN!=='false';
+if(obsidianEnabled){
+  if(!obsidianVault||!path.isAbsolute(obsidianVault))throw Error('OBSIDIAN_VAULT_DIR must be an absolute path when Obsidian sync is enabled.');
+  if(Boolean(process.env.OBSIDIAN_AI_ENDPOINT)!==Boolean(process.env.OBSIDIAN_AI_MODEL))throw Error('Set both OBSIDIAN_AI_ENDPOINT and OBSIDIAN_AI_MODEL, or neither.');
+  initializeOutbox(db);
+}
+const obsidianSummarize=obsidianEnabled&&process.env.OBSIDIAN_AI_ENDPOINT?openAICompatibleSummarizer({endpoint:process.env.OBSIDIAN_AI_ENDPOINT,model:process.env.OBSIDIAN_AI_MODEL,apiKey:process.env.OBSIDIAN_AI_API_KEY||''}):null;
+let syncing=false, syncAgain=false;
+async function runObsidian(){
+  if(!obsidianEnabled)return;
+  if(syncing){syncAgain=true;return;}
+  syncing=true;
+  try{do{
+    syncAgain=false;
+    const results=await drainOutbox({db,vaultDir:obsidianVault,resolveBook:bookDetails,summarize:obsidianSummarize,dryRun:obsidianDryRun});
+    for(const result of results)console.log('Obsidian sync:',result.id,result.action,result.error||'');
+  }while(syncAgain);
+  }catch(error){console.error('Obsidian sync stopped:',error.message);}finally{syncing=false;}
+}
+function noteWrite(sql,values,key,book){
+  db.exec('BEGIN IMMEDIATE');
+  try{const changed=db.prepare(sql).run(...values).changes;if(obsidianEnabled&&changed)queueNote(db,{id:key,book});db.exec('COMMIT');return changed;}
+  catch(error){db.exec('ROLLBACK');throw error;}
+}
 const sessions=new Map(), queue=[], cancel=new Set(); let working=false;
 function failure(message,status=400){const e=new Error(message);e.status=status;return e;}
 function id(value){if(!/^[a-zA-Z0-9_-]{1,150}$/.test(value||''))throw failure('Invalid book identifier');return value;}
@@ -249,11 +276,12 @@ const server=http.createServer(async(req,res)=>{
         const b=await bookDetails(book);const n=await body(req,25000);const start=number(n.start,0,b.duration),end=number(n.end,start,b.duration+1);
         const quote=String(n.quote||'').trim(),note=String(n.note||'').trim();if(!quote||quote.length>10000||note.length>10000)throw failure('Select a passage and keep notes under 10,000 characters.');
         const color=['gold','green','blue'].includes(n.color)?n.color:'gold';const key=randomBytes(12).toString('hex');
-        db.prepare('INSERT INTO notes VALUES (?,?,?,?,?,?,?,?)').run(key,book,start,end,quote,note,color,new Date().toISOString());return json(res,201,noteList(book));
+        noteWrite('INSERT INTO notes VALUES (?,?,?,?,?,?,?,?)',[key,book,start,end,quote,note,color,new Date().toISOString()],key,book);void runObsidian();return json(res,201,noteList(book));
       }
       if(action.startsWith('notes/')&&['PATCH','DELETE'].includes(req.method)){
-        const key=id(action.slice(6));if(req.method==='DELETE')db.prepare('DELETE FROM notes WHERE id=? AND book=?').run(key,book);
-        else{const input=await body(req,25000);const note=String(input.note||'');if(note.length>10000)throw failure('Note is too long');db.prepare('UPDATE notes SET note=? WHERE id=? AND book=?').run(note,key,book);}
+        const key=id(action.slice(6));if(req.method==='DELETE')noteWrite('DELETE FROM notes WHERE id=? AND book=?',[key,book],key,book);
+        else{const input=await body(req,25000);const note=String(input.note||'');if(note.length>10000)throw failure('Note is too long');noteWrite('UPDATE notes SET note=? WHERE id=? AND book=?',[note,key,book],key,book);}
+        void runObsidian();
         return json(res,200,noteList(book));
       }
       if(action==='export'){
@@ -278,4 +306,5 @@ const server=http.createServer(async(req,res)=>{
   }catch(e){if(res.headersSent){res.destroy();return;}json(res,e.status||500,{error:e.status?e.message:'The request failed. Check the server configuration and try again.'});}
 });
 server.listen(Number(process.env.PORT||8787),process.env.HOST||'127.0.0.1',()=>console.log(`Margin ${demo?'sample':'server'} ready at http://${process.env.HOST||'127.0.0.1'}:${process.env.PORT||8787}`));
+if(obsidianEnabled){void runObsidian();if(!obsidianDryRun)setInterval(()=>void runObsidian(),10000).unref();}
 export { server,db };

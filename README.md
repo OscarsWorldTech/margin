@@ -11,6 +11,7 @@ Listen to your Audiobookshelf library, follow the book text or generated caption
 - Read along with the active sentence, search passages, and jump to chapters.
 - Pair EPUBs from your ebook folder, or import aligned Storyteller EPUBs.
 - Save sentence highlights and notes; export them as Markdown or JSON.
+- Optionally [sync annotations to an isolated Obsidian vault](docs/OBSIDIAN_SYNC.md) with nearby text and local AI summaries.
 - Keep listening while browsing your library, and fine-tune playback speed.
 - Resume your listening position between Margin and Audiobookshelf.
 - Generate captions with Intel/Vulkan, NVIDIA/CUDA, or CPU transcription. Import SRT/VTT when you already have captions.

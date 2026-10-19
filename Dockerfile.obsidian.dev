@@ -1,0 +1,20 @@
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS build
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY . .
+RUN npm run build
+
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+WORKDIR /app
+COPY --from=build /build/dist ./dist
+COPY server ./server
+COPY --from=build /build/node_modules/@zip.js/zip.js ./node_modules/@zip.js/zip.js
+COPY --from=build /build/node_modules/@xmldom/xmldom ./node_modules/@xmldom/xmldom
+COPY package.json LICENSE ./
+COPY public/demo.json public/demo.wav ./public/
+RUN mkdir -p /data/cache /obsidian-vault && chown -R node:node /data /obsidian-vault /app
+ENV PORT=8787 DATA_DIR=/data
+USER node
+EXPOSE 8787
+CMD ["node", "server/index.mjs"]
