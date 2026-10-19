@@ -80,6 +80,20 @@ test('ebook overlay preserves existing volumes and mounts the library read-only'
   }
 });
 
+test('Obsidian development Compose is isolated, opt-in and loopback-only',async t=>{
+  const dockerArgs=process.env.DOCKER_CONFIG?['--config',process.env.DOCKER_CONFIG]:[];
+  if(spawnSync('docker',[...dockerArgs,'compose','version'],{windowsHide:true}).status!==0){t.skip('Docker Compose CLI is not installed.');return;}
+  const result=spawnSync('docker',[...dockerArgs,'compose','--env-file','.env.obsidian.dev.example','-f','compose.obsidian.dev.yml','config','--format','json'],{cwd:root,encoding:'utf8',windowsHide:true});
+  assert.equal(result.status,0,result.stderr);
+  const config=JSON.parse(result.stdout),app=config.services.margin;
+  assert.equal(config.name,'margin-obsidian-dev');
+  assert.deepEqual(Object.keys(config.services),['margin']);
+  assert.equal(app.ports[0].host_ip,'127.0.0.1');assert.equal(app.ports[0].published,'18787');
+  assert.equal(app.environment.OBSIDIAN_SYNC_ENABLED,'false');assert.equal(app.environment.OBSIDIAN_SYNC_DRY_RUN,'true');
+  assert.deepEqual(app.volumes.map(v=>[v.type,v.source,v.target]),[['volume','obsidian-dev-data','/data'],['volume','obsidian-dev-vault','/obsidian-vault']]);
+  assert.match(await readFile(path.join(root,'Dockerfile.obsidian.dev'),'utf8'),/^FROM node:24\.21\.0-bookworm-slim@sha256:[a-f0-9]{64}/m);
+});
+
 test('setup preserves literal credentials, persists hardware choice, and rejects invalid modes without changes',async t=>{
   if(process.platform==='win32'&&!existsSync(bash)){t.skip('Git Bash is not installed.');return;}
   const folder=await mkdtemp(path.join(tmpdir(),'margin-setup-test-'));

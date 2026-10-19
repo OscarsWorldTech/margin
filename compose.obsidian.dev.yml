@@ -1,0 +1,30 @@
+name: margin-obsidian-dev
+services:
+  margin:
+    build:
+      context: .
+      dockerfile: Dockerfile.obsidian.dev
+    image: margin-obsidian-dev:local
+    ports:
+      - "127.0.0.1:18787:8787"
+    environment:
+      HOST: 0.0.0.0
+      DEMO_MODE: ${DEMO_MODE:-true}
+      ABS_URL: ${ABS_URL:-}
+      ABS_TOKEN: ${ABS_TOKEN:-}
+      MARGIN_PASSWORD: ${MARGIN_PASSWORD:-}
+      OBSIDIAN_SYNC_ENABLED: ${OBSIDIAN_SYNC_ENABLED:-false}
+      OBSIDIAN_SYNC_DRY_RUN: ${OBSIDIAN_SYNC_DRY_RUN:-true}
+      OBSIDIAN_VAULT_DIR: /obsidian-vault
+      OBSIDIAN_AI_ENDPOINT: ${OBSIDIAN_AI_ENDPOINT:-}
+      OBSIDIAN_AI_MODEL: ${OBSIDIAN_AI_MODEL:-}
+      OBSIDIAN_AI_API_KEY: ${OBSIDIAN_AI_API_KEY:-}
+    volumes:
+      - obsidian-dev-data:/data
+      - obsidian-dev-vault:/obsidian-vault
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+volumes:
+  obsidian-dev-data:
+  obsidian-dev-vault:

@@ -4,7 +4,6 @@ import http from 'node:http';
 import {once} from 'node:events';
 import {spawn} from 'node:child_process';
 import {mkdtemp,readFile,rm,mkdir,writeFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {storytellerFixture} from './storyteller-fixture.mjs';
@@ -13,7 +12,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function listen(server){server.listen(0,'127.0.0.1');await once(server,'listening');return 'http://127.0.0.1:'+server.address().port;}
 async function unusedPort(){const s=http.createServer();await listen(s);const p=s.address().port;await new Promise(r=>s.close(r));return p;}
 test('Audiobookshelf integration: authentication, streaming, notes, exports, persistence and resumable transcription',{timeout:45000},async t=>{
- const folder=await mkdtemp(path.join(tmpdir(),'margin-test-'));const wav=await readFile(path.join(root,'public/demo.wav'));
+ await mkdir(path.join(root,'work'),{recursive:true});const folder=await mkdtemp(path.join(root,'work','margin-test-'));const wav=await readFile(path.join(root,'public/demo.wav'));
+ const vault=path.join(folder,'isolated-vault');await mkdir(vault);let sync=false,syncDryRun=true;
  const ebookDirectory=path.join(folder,'ebooks');await mkdir(ebookDirectory);await writeFile(path.join(ebookDirectory,'Test book.epub'),Buffer.from(await(await storytellerFixture({'EPUB/text/ch1.xhtml':'<html><body><p>An imported sentence.</p></body></html>'})).arrayBuffer()));
  const received=[];let inference=0,failSecond=true,processHandle,cookie='',remoteTime=13,progressStatus=200;
  const send=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(obj));};
@@ -42,12 +42,12 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
    return send(res,200,{segments:[{start:0,end:5,text:'A sentence worth keeping.'},{start:5,end:10,text:'Another thought.'}]});
  });
  const workerUrl=await listen(worker);const port=await unusedPort();const base='http://127.0.0.1:'+port;
- async function start(){processHandle=spawn(process.execPath,['server/index.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:folder,EBOOK_DIR:ebookDirectory,ABS_URL:absUrl+'/abs',ABS_TOKEN:'private-test-token',MARGIN_PASSWORD:'test-password-long-unique',WHISPER_URL:workerUrl,DEMO_MODE:'false',ALLOW_INSECURE_HTTP:'false',COOKIE_SECURE:'auto',TRUSTED_PROXIES:'127.0.0.1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
+ async function start(){processHandle=spawn(process.execPath,['server/index.mjs'],{cwd:root,env:{...process.env,PORT:String(port),HOST:'127.0.0.1',DATA_DIR:folder,EBOOK_DIR:ebookDirectory,ABS_URL:absUrl+'/abs',ABS_TOKEN:'private-test-token',MARGIN_PASSWORD:'test-password-long-unique',WHISPER_URL:workerUrl,DEMO_MODE:'false',ALLOW_INSECURE_HTTP:'false',COOKIE_SECURE:'auto',TRUSTED_PROXIES:'127.0.0.1',OBSIDIAN_SYNC_ENABLED:String(sync),OBSIDIAN_SYNC_DRY_RUN:String(syncDryRun),OBSIDIAN_VAULT_DIR:vault},stdio:['ignore','pipe','pipe'],windowsHide:true});
    let output='';processHandle.stdout.on('data',d=>output+=d);processHandle.stderr.on('data',d=>output+=d);
    for(let i=0;i<100;i++){if(processHandle.exitCode!==null)throw new Error(output);try{if((await fetch(base+'/api/health')).ok)return;}catch{}await sleep(50);}throw new Error('Server did not start: '+output);
  }
  async function stop(){if(processHandle&&processHandle.exitCode===null){processHandle.kill();await once(processHandle,'exit');}}
- t.after(async()=>{await stop();await Promise.all([new Promise(r=>abs.close(r)),new Promise(r=>worker.close(r))]);if(!path.resolve(folder).startsWith(path.resolve(tmpdir())+path.sep+'margin-test-'))throw new Error('Unexpected temporary directory');await rm(folder,{recursive:true,force:true});});
+ t.after(async()=>{await stop();await Promise.all([new Promise(r=>abs.close(r)),new Promise(r=>worker.close(r))]);if(!path.resolve(folder).startsWith(path.join(root,'work','margin-test-')))throw new Error('Unexpected temporary directory');await rm(folder,{recursive:true,force:true});});
  async function request(p,body,method){return fetch(base+'/api'+p,{method:method||(body===undefined?'GET':'POST'),headers:{Cookie:cookie,...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});}
  async function login(){const r=await request('/login',{password:'test-password-long-unique'});assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0];}
  await start();
@@ -73,6 +73,7 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
  const denied=await fetch(base+'/api/books/book1/notes',{method:'POST',headers:{Cookie:cookie,Origin:'https://elsewhere.invalid','Content-Type':'application/json'},body:'{}'});assert.equal(denied.status,403);
  assert.equal((await request('/books/book1/notes',{start:-1,end:2,quote:'Invalid',note:''})).status,400);
  const saved=await(await request('/books/book1/notes',{start:2,end:5,quote:'Saved original passage.',note:'My own idea',color:'green'})).json();assert.equal(saved.length,1);const note=saved[0];
+ await assert.rejects(readFile(path.join(vault,'Margin Imports','book1',note.id+'.md')),{code:'ENOENT'},'sync stays off by default');
  assert.equal((await request('/books/book1/position',{time:9})).status,200);
  assert.equal(remoteTime,9,'Margin writes the Audiobookshelf account progress');
  assert.equal((await(await request('/books/book1/position')).json()).time,9);
@@ -86,7 +87,18 @@ test('Audiobookshelf integration: authentication, streaming, notes, exports, per
  assert.equal((await request('/books/book1/position',{time:23})).status,400);
  const edited=await(await request('/books/book1/notes/'+note.id,{note:'Edited idea'},'PATCH')).json();assert.equal(edited[0].note,'Edited idea');
  const exp=await(await request('/books/book1/export')).text();assert.match(exp,/00:00:02/);assert.match(exp,/Saved original passage/);assert.match(exp,/Edited idea/);
- await stop();await start();await login();const restored=await(await request('/books/book1')).json();assert.equal(restored.notes[0].id,note.id);
+ await stop();sync=true;await start();await login();const restored=await(await request('/books/book1')).json();assert.equal(restored.notes[0].id,note.id);
+ const synced=await(await request('/books/book1/notes',{start:6,end:8,quote:'A second passage.',note:'First thought',color:'blue'})).json();
+ const syncedId=synced.find(n=>n.id!==note.id).id,syncedFile=path.join(vault,'Margin Imports','book1',syncedId+'.md');
+ await sleep(200);await assert.rejects(readFile(syncedFile,'utf8'),{code:'ENOENT'},'dry run never writes');
+ await stop();syncDryRun=false;await start();await login();
+ async function waitForText(pattern){for(let i=0;i<100;i++){try{const text=await readFile(syncedFile,'utf8');if(pattern.test(text))return text;}catch(error){if(error.code!=='ENOENT')throw error;}await sleep(50);}throw Error('Obsidian export did not reach '+pattern);}
+ assert.match(await waitForText(/First thought/),/A second passage/);
+ await writeFile(syncedFile,(await readFile(syncedFile,'utf8'))+'\nIndependent Obsidian note.\n');
+ assert.equal((await request('/books/book1/notes/'+syncedId,{note:'Revised thought'},'PATCH')).status,200);
+ assert.match(await waitForText(/Revised thought/),/Independent Obsidian note/);
+ assert.equal((await request('/books/book1/notes/'+syncedId,{},'DELETE')).status,200);
+ assert.match(await waitForText(/Removed \(archived copy retained\)/),/Independent Obsidian note/);
  assert.equal((await request('/books/book1/captions',{text:'1\n00:00:00,000 --> 00:00:02,000\nAn imported sentence.'})).status,200);
  assert.equal((await(await request('/books/book1')).json()).notes[0].quote,'Saved original passage.');
  const originalCaptions=(await(await request('/books/book1')).json()).cues;
